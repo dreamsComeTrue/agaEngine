@@ -1,0 +1,10 @@
+#Indicate this is the config of the root
+root = true
+
+# Apply the following rules to these file types
+[{*.{cpp,cc,c,h,hpp,txt}}]
+end_of_line = lf                #Unix type line endings
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
