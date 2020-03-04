@@ -1,15 +1,16 @@
 // Copyright (C) 2020 Dominik 'dreamsComeTrue' Jasiński
 
+#include "MainLoop.h"
 #include "core/Logger.h"
-#include "render/VulkanRenderer.h"
+#include "core/Typedefs.h"
 
 int main(int argc, char *argv[])
 {
-    LOG_DEBUG("Starting agaEngine\n");
+    LOG_INFO("..:: agaEngine ::.. [v " + ENGINE_VERSION_STRING + "]\n");
 
     {
-        aga::VulkanRenderer renderer;
-        renderer.RenderFrame();
+        aga::MainLoop mainLoop;
+        mainLoop.Iterate();
     }
 
     LOG_DEBUG("Finishing agaEngine\n");

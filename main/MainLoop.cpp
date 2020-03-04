@@ -15,4 +15,10 @@ namespace aga
         SAFE_DELETE(m_Renderer);
     }
 
+    bool MainLoop::Iterate() const
+    {
+        m_Renderer->RenderFrame();
+
+        return true;
+    }
 }  // namespace aga

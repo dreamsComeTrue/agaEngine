@@ -12,8 +12,8 @@ namespace aga
     {
         std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
-        char timeBuffer[100] = {0};
-        std::strftime(timeBuffer, sizeof(timeBuffer), "%T", std::localtime(&now));
+        char time_buffer[100] = {0};
+        std::strftime(time_buffer, sizeof(time_buffer), "%T", std::localtime(&now));
 
         char severity[10];
 
@@ -33,6 +33,6 @@ namespace aga
                 break;
         }
 
-        std::cout << timeBuffer << " " << severity << ": " << message;
+        std::cout << time_buffer << " " << severity << ": " << message;
     }
 }  // namespace aga

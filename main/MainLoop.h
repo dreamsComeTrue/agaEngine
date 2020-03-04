@@ -12,7 +12,7 @@ namespace aga
         MainLoop();
         ~MainLoop();
 
-        bool Iterate();
+        bool Iterate() const;
 
     private:
         VulkanRenderer *m_Renderer;
