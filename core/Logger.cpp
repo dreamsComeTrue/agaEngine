@@ -4,11 +4,10 @@
 
 #include <chrono>
 #include <iostream>
-#include <string.h>
 
 namespace aga
 {
-    void Logger::Log(LogLevel level, const std::string &message)
+    void Logger::Log(LogLevel level, const String &message)
     {
         std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
@@ -20,16 +19,16 @@ namespace aga
         switch (level)
         {
             case LogLevel::Debug:
-                strcpy(severity, "DEBUG");
+                StrCopy(severity, "DEBUG");
                 break;
             case LogLevel::Info:
-                strcpy(severity, "INFO");
+                StrCopy(severity, "INFO");
                 break;
             case LogLevel::Warning:
-                strcpy(severity, "WARNING");
+                StrCopy(severity, "WARNING");
                 break;
             case LogLevel::Error:
-                strcpy(severity, "ERROR");
+                StrCopy(severity, "ERROR");
                 break;
         }
 

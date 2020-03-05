@@ -10,3 +10,12 @@
             x = nullptr;                                                                           \
         }                                                                                          \
     }
+
+#define SAFE_DELETE_ARRAY(x)                                                                       \
+    {                                                                                              \
+        if (x)                                                                                     \
+        {                                                                                          \
+            delete[] x;                                                                            \
+            x = nullptr;                                                                           \
+        }                                                                                          \
+    }

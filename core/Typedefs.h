@@ -6,7 +6,9 @@
 #define ENGINE_VERSION_MAJOR 0
 #define ENGINE_VERSION_MINOR 1
 #define ENGINE_VERSION_PATCH 0
+#define ENGINE_VERSION_STRING aga::String("0.1.0")
 
-#define ENGINE_VERSION_STRING                                                                      \
-    std::to_string(ENGINE_VERSION_MAJOR) + "." + std::to_string(ENGINE_VERSION_MINOR) + "." +      \
-        std::to_string(ENGINE_VERSION_PATCH)
+// #define ENGINE_VERSION_STRING                                                                      \
+//     aga::String((uint32_t)ENGINE_VERSION_MAJOR) + "." +                                            \
+//         aga::String((uint32_t)ENGINE_VERSION_MINOR) + "." +                                        \
+//         aga::String((uint32_t)ENGINE_VERSION_PATCH)
