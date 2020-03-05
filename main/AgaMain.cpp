@@ -2,6 +2,7 @@
 
 #include "MainLoop.h"
 #include "core/Logger.h"
+#include "core/Memory.h"
 #include "core/Typedefs.h"
 
 int main(int argc, char *argv[])
@@ -14,6 +15,8 @@ int main(int argc, char *argv[])
     }
 
     LOG_DEBUG("Finishing agaEngine\n");
+
+    aga::MemoryTracker::getInstance().PrintStatistics();
 
     return 0;
 }

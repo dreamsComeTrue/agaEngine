@@ -13,12 +13,12 @@ namespace aga
         m_VulkanDevice(nullptr),
         m_VulkanPhysicalDevice(nullptr)
     {
-        _Initialize();
+       _Initialize();
     }
 
     VulkanRenderer::~VulkanRenderer()
     {
-        _Destroy();
+       _Destroy();
     }
 
     void VulkanRenderer::RenderFrame()
@@ -87,15 +87,11 @@ namespace aga
     bool VulkanRenderer::_InitDevice()
     {
         uint32_t physicalDevicesCount = 0;
-
         vkEnumeratePhysicalDevices(m_VulkanInstance, &physicalDevicesCount, nullptr);
-
         std::vector<VkPhysicalDevice> devices(physicalDevicesCount);
-
         vkEnumeratePhysicalDevices(m_VulkanInstance, &physicalDevicesCount, devices.data());
 
-        LOG_DEBUG("Number of Physical Devices found: " + std::to_string(physicalDevicesCount) +
-                  "\n");
+        LOG_DEBUG("Number of Physical Devices found: " + String(physicalDevicesCount) + "\n");
 
         if (physicalDevicesCount < 1)
         {
@@ -109,10 +105,9 @@ namespace aga
         VkPhysicalDeviceProperties physicalDeviceProperties = {};
         vkGetPhysicalDeviceProperties(m_VulkanPhysicalDevice, &physicalDeviceProperties);
 
-        LOG_DEBUG(std::string("Physical Device name: ") + physicalDeviceProperties.deviceName +
-                  "\n");
+        LOG_DEBUG(String("Physical Device name: ") + physicalDeviceProperties.deviceName + "\n");
 
-        std::string deviceType;
+        String deviceType;
 
         switch (physicalDeviceProperties.deviceType)
         {
@@ -125,14 +120,12 @@ namespace aga
                 break;
         }
 
-        LOG_DEBUG(std::string("Physical Device type: ") + deviceType + "\n");
+        LOG_DEBUG(String("Physical Device type: ") + deviceType + "\n");
 
         uint32_t queueFamilyProperyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(m_VulkanPhysicalDevice, &queueFamilyProperyCount,
                                                  nullptr);
-
         std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyProperyCount);
-
         vkGetPhysicalDeviceQueueFamilyProperties(m_VulkanPhysicalDevice, &queueFamilyProperyCount,
                                                  queueFamilyProperties.data());
 
@@ -155,7 +148,30 @@ namespace aga
             return false;
         }
 
-        float queuePriorities[]{1.0f};
+        uint32_t instanceLayersCount = 0;
+        vkEnumerateInstanceLayerProperties(&instanceLayersCount, nullptr);
+        std::vector<VkLayerProperties> instanceLayerProperties(instanceLayersCount);
+        vkEnumerateInstanceLayerProperties(&instanceLayersCount, instanceLayerProperties.data());
+
+        LOG_DEBUG("Instance layers:\n");
+        for (const VkLayerProperties &layer : instanceLayerProperties)
+        {
+            LOG_DEBUG(String("\t") + layer.layerName + " -> " + layer.description + "\n");
+        }
+
+        uint32_t deviceLayersCount = 0;
+        vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount, nullptr);
+        std::vector<VkLayerProperties> deviceLayerProperties(deviceLayersCount);
+        vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount,
+                                         deviceLayerProperties.data());
+
+        LOG_DEBUG("Device layers:\n");
+        for (const VkLayerProperties &layer : deviceLayerProperties)
+        {
+            LOG_DEBUG(String("\t") + layer.layerName + " -> " + layer.description + "\n");
+        }
+
+        float queuePriorities[] = {1.0f};
         VkDeviceQueueCreateInfo queueCreateInfo = {};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueCount = 1;
