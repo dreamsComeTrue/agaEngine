@@ -39,14 +39,14 @@ namespace aga
         return VK_FALSE;
     }
 
-    PFN_vkCreateDebugReportCallbackEXT createDebugReportCallbackEXTFunc = nullptr;
-    PFN_vkDestroyDebugReportCallbackEXT destroDebugReportCallbackEXTFunc = nullptr;
+    PFN_vkCreateDebugReportCallbackEXT createDebugReportCallbackEXTFunc = VK_NULL_HANDLE;
+    PFN_vkDestroyDebugReportCallbackEXT destroDebugReportCallbackEXTFunc = VK_NULL_HANDLE;
 
     VulkanRenderer::VulkanRenderer() :
-        m_VulkanInstance(nullptr),
-        m_VulkanDevice(nullptr),
-        m_VulkanPhysicalDevice(nullptr),
-        m_DebugReport(nullptr)
+        m_VulkanInstance(VK_NULL_HANDLE),
+        m_VulkanDevice(VK_NULL_HANDLE),
+        m_VulkanPhysicalDevice(VK_NULL_HANDLE),
+        m_DebugReport(VK_NULL_HANDLE)
     {
         _Initialize();
     }
@@ -114,7 +114,7 @@ namespace aga
         instanceCreateInfo.ppEnabledExtensionNames = m_InstanceExtensions.data();
         instanceCreateInfo.pNext = &m_DebugCallbackCreateInfo;
 
-        VkResult result = vkCreateInstance(&instanceCreateInfo, nullptr, &m_VulkanInstance);
+        VkResult result = vkCreateInstance(&instanceCreateInfo, VK_NULL_HANDLE, &m_VulkanInstance);
 
         if (result != VK_SUCCESS)
         {
@@ -132,8 +132,8 @@ namespace aga
     {
         if (m_VulkanInstance)
         {
-            vkDestroyInstance(m_VulkanInstance, nullptr);
-            m_VulkanInstance = nullptr;
+            vkDestroyInstance(m_VulkanInstance, VK_NULL_HANDLE);
+            m_VulkanInstance = VK_NULL_HANDLE;
 
             LOG_DEBUG_F("vkDestroyInstance destroyed\n");
         }
@@ -142,7 +142,7 @@ namespace aga
     bool VulkanRenderer::_InitDevice()
     {
         uint32_t physicalDevicesCount = 0;
-        vkEnumeratePhysicalDevices(m_VulkanInstance, &physicalDevicesCount, nullptr);
+        vkEnumeratePhysicalDevices(m_VulkanInstance, &physicalDevicesCount, VK_NULL_HANDLE);
         std::vector<VkPhysicalDevice> devices(physicalDevicesCount);
         vkEnumeratePhysicalDevices(m_VulkanInstance, &physicalDevicesCount, devices.data());
 
@@ -179,7 +179,7 @@ namespace aga
 
         uint32_t queueFamilyProperyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(m_VulkanPhysicalDevice, &queueFamilyProperyCount,
-                                                 nullptr);
+                                                 VK_NULL_HANDLE);
         std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyProperyCount);
         vkGetPhysicalDeviceQueueFamilyProperties(m_VulkanPhysicalDevice, &queueFamilyProperyCount,
                                                  queueFamilyProperties.data());
@@ -204,7 +204,7 @@ namespace aga
         }
 
         uint32_t instanceLayersCount = 0;
-        vkEnumerateInstanceLayerProperties(&instanceLayersCount, nullptr);
+        vkEnumerateInstanceLayerProperties(&instanceLayersCount, VK_NULL_HANDLE);
         std::vector<VkLayerProperties> instanceLayerProperties(instanceLayersCount);
         vkEnumerateInstanceLayerProperties(&instanceLayersCount, instanceLayerProperties.data());
 
@@ -215,7 +215,7 @@ namespace aga
         }
 
         uint32_t deviceLayersCount = 0;
-        vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount, nullptr);
+        vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount, VK_NULL_HANDLE);
         std::vector<VkLayerProperties> deviceLayerProperties(deviceLayersCount);
         vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount,
                                          deviceLayerProperties.data());
@@ -243,7 +243,7 @@ namespace aga
         deviceCreateInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
 
         VkResult result =
-            vkCreateDevice(m_VulkanPhysicalDevice, &deviceCreateInfo, nullptr, &m_VulkanDevice);
+            vkCreateDevice(m_VulkanPhysicalDevice, &deviceCreateInfo, VK_NULL_HANDLE, &m_VulkanDevice);
 
         if (result != VK_SUCCESS)
         {
@@ -261,8 +261,8 @@ namespace aga
     {
         if (m_VulkanDevice)
         {
-            vkDestroyDevice(m_VulkanDevice, nullptr);
-            m_VulkanDevice = nullptr;
+            vkDestroyDevice(m_VulkanDevice, VK_NULL_HANDLE);
+            m_VulkanDevice = VK_NULL_HANDLE;
 
             LOG_DEBUG_F("m_VulkanDevice destroyed\n");
         }
@@ -277,8 +277,8 @@ namespace aga
             (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(
                 m_VulkanInstance, "vkDestroyDebugReportCallbackEXT");
 
-        if (createDebugReportCallbackEXTFunc == nullptr ||
-            destroDebugReportCallbackEXTFunc == nullptr)
+        if (createDebugReportCallbackEXTFunc == VK_NULL_HANDLE ||
+            destroDebugReportCallbackEXTFunc == VK_NULL_HANDLE)
         {
             LOG_ERROR_F("Can not acquire 'vkCreateDebugReportCallbackEXT' or "
                         "'vkDestroyDebugReportCallbackEXT' functions!\n");
@@ -286,7 +286,7 @@ namespace aga
             return false;
         }
 
-        createDebugReportCallbackEXTFunc(m_VulkanInstance, &m_DebugCallbackCreateInfo, nullptr,
+        createDebugReportCallbackEXTFunc(m_VulkanInstance, &m_DebugCallbackCreateInfo, VK_NULL_HANDLE,
                                          &m_DebugReport);
 
         LOG_DEBUG_F("Vulkan debugging enabled\n");
@@ -296,8 +296,8 @@ namespace aga
 
     bool VulkanRenderer::_DestroyDebugging()
     {
-        destroDebugReportCallbackEXTFunc(m_VulkanInstance, m_DebugReport, nullptr);
-        m_DebugReport = nullptr;
+        destroDebugReportCallbackEXTFunc(m_VulkanInstance, m_DebugReport, VK_NULL_HANDLE);
+        m_DebugReport = VK_NULL_HANDLE;
 
         LOG_DEBUG_F("Vulkan debugging destroyed\n");
 
