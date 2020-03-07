@@ -5,6 +5,7 @@
 #include "core/Common.h"
 #include "core/Logger.h"
 #include "core/Typedefs.h"
+#include "platform/Platform.h"
 #include "platform/PlatformWindow.h"
 
 namespace aga
@@ -125,6 +126,14 @@ namespace aga
 
         m_InstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
         m_InstanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+
+        std::vector<const char *> requiredExtensions =
+            Platform::getInstance()->GetRequiredExtensions();
+
+        for (const char *ext : requiredExtensions)
+        {
+            m_InstanceExtensions.push_back(ext);
+        }
 
         VkApplicationInfo applicationInfo = {};
         applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;

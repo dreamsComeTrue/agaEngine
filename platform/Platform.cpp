@@ -14,13 +14,13 @@
 namespace aga
 {
 #if defined(_WIN32)
-    PlatformBase *Platform::s_PLatformBase = new X11Platform();
+    PlatformBase *Platform::s_PlatformBase = new X11Platform();
 #elif defined(__linux)
-    PlatformBase *Platform::s_PLatformBase = new X11Platform();
+    PlatformBase *Platform::s_PlatformBase = new X11Platform();
 #endif
 
     PlatformBase *Platform::getInstance()
     {
-        return s_PLatformBase;
+        return s_PlatformBase;
     }
 }  // namespace aga

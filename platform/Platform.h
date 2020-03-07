@@ -24,5 +24,21 @@ namespace aga
         virtual std::vector<const char *> GetRequiredExtensions() = 0;
     };
 
-m_ShouldRun
+    class Platform
+    {
+    public:
+        static PlatformBase *getInstance();
+
+    private:
+        Platform()
+        {
+        }
+
+    public:
+        Platform(Platform const &) = delete;
+        void operator=(Platform const &) = delete;
+
+    private:
+        static PlatformBase *s_PlatformBase;
+    };
 }  // namespace aga
