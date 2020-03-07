@@ -29,10 +29,14 @@ namespace aga
         bool _InitDebugging();
         bool _DestroyDebugging();
 
+        void _CreateCommandPool();
+
     private:
         VkInstance m_VulkanInstance;
         VkDevice m_VulkanDevice;
         VkPhysicalDevice m_VulkanPhysicalDevice;
+        uint32_t m_GraphicsFamilyIndex;
+        VkQueue m_Queue;
 
         std::vector<const char *> m_InstanceLayers;
         std::vector<const char *> m_InstanceExtensions;

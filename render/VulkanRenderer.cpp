@@ -46,9 +46,12 @@ namespace aga
         m_VulkanInstance(VK_NULL_HANDLE),
         m_VulkanDevice(VK_NULL_HANDLE),
         m_VulkanPhysicalDevice(VK_NULL_HANDLE),
+        m_GraphicsFamilyIndex(0),
+        m_Queue(VK_NULL_HANDLE),
         m_DebugReport(VK_NULL_HANDLE)
     {
         _Initialize();
+        _CreateCommandPool();
     }
 
     VulkanRenderer::~VulkanRenderer()
@@ -185,13 +188,12 @@ namespace aga
                                                  queueFamilyProperties.data());
 
         bool foundGraphicsBit = false;
-        uint32_t graphicsFamilyIndex = -1;
         for (uint32_t i = 0; i < queueFamilyProperyCount; ++i)
         {
             if (queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
             {
                 foundGraphicsBit = true;
-                graphicsFamilyIndex = i;
+                m_GraphicsFamilyIndex = i;
                 break;
             }
         }
@@ -215,7 +217,8 @@ namespace aga
         }
 
         uint32_t deviceLayersCount = 0;
-        vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount, VK_NULL_HANDLE);
+        vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount,
+                                         VK_NULL_HANDLE);
         std::vector<VkLayerProperties> deviceLayerProperties(deviceLayersCount);
         vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount,
                                          deviceLayerProperties.data());
@@ -230,7 +233,7 @@ namespace aga
         VkDeviceQueueCreateInfo queueCreateInfo = {};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueCount = 1;
-        queueCreateInfo.queueFamilyIndex = graphicsFamilyIndex;
+        queueCreateInfo.queueFamilyIndex = m_GraphicsFamilyIndex;
         queueCreateInfo.pQueuePriorities = queuePriorities;
 
         VkDeviceCreateInfo deviceCreateInfo = {};
@@ -242,8 +245,8 @@ namespace aga
         deviceCreateInfo.enabledExtensionCount = m_DeviceExtensions.size();
         deviceCreateInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
 
-        VkResult result =
-            vkCreateDevice(m_VulkanPhysicalDevice, &deviceCreateInfo, VK_NULL_HANDLE, &m_VulkanDevice);
+        VkResult result = vkCreateDevice(m_VulkanPhysicalDevice, &deviceCreateInfo, VK_NULL_HANDLE,
+                                         &m_VulkanDevice);
 
         if (result != VK_SUCCESS)
         {
@@ -251,6 +254,8 @@ namespace aga
 
             return false;
         }
+
+        vkGetDeviceQueue(m_VulkanDevice, m_GraphicsFamilyIndex, 0, &m_Queue);
 
         LOG_DEBUG_F("vkCreateDevice succeeded\n");
 
@@ -286,8 +291,8 @@ namespace aga
             return false;
         }
 
-        createDebugReportCallbackEXTFunc(m_VulkanInstance, &m_DebugCallbackCreateInfo, VK_NULL_HANDLE,
-                                         &m_DebugReport);
+        createDebugReportCallbackEXTFunc(m_VulkanInstance, &m_DebugCallbackCreateInfo,
+                                         VK_NULL_HANDLE, &m_DebugReport);
 
         LOG_DEBUG_F("Vulkan debugging enabled\n");
 
@@ -302,6 +307,66 @@ namespace aga
         LOG_DEBUG_F("Vulkan debugging destroyed\n");
 
         return true;
+    }
+
+    void VulkanRenderer::_CreateCommandPool()
+    {
+        VkCommandPoolCreateInfo poolCreateInfo = {};
+        poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolCreateInfo.queueFamilyIndex = m_GraphicsFamilyIndex;
+        poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+        VkCommandPool commandPool;
+        vkCreateCommandPool(m_VulkanDevice, &poolCreateInfo, VK_NULL_HANDLE, &commandPool);
+
+        VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
+        commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        commandBufferAllocateInfo.commandPool = commandPool;
+        commandBufferAllocateInfo.commandBufferCount = 1;
+        commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+        VkCommandBuffer commandBuffer;
+        vkAllocateCommandBuffers(m_VulkanDevice, &commandBufferAllocateInfo, &commandBuffer);
+
+        VkCommandBufferBeginInfo commandBufferBeginInfo = {};
+        commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+        {
+            VkViewport viewport = {};
+            viewport.x = 0.f;
+            viewport.y = 0.f;
+            viewport.width = 512.f;
+            viewport.height = 512.f;
+            viewport.minDepth = 0.f;
+            viewport.maxDepth = 1.f;
+
+            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        }
+        vkEndCommandBuffer(commandBuffer);
+
+        VkSubmitInfo submitInfo = {};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &commandBuffer;
+
+        VkFenceCreateInfo fenceCreateInfo = {};
+        fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+
+        VkFence fence;
+        vkCreateFence(m_VulkanDevice, &fenceCreateInfo, VK_NULL_HANDLE, &fence);
+        
+        VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+        semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        
+        VkSemaphore semaphore;
+        vkCreateSemaphore(m_VulkanDevice, &semaphoreCreateInfo, VK_NULL_HANDLE, &semaphore);
+
+        vkQueueSubmit(m_Queue, 1, &submitInfo, fence);
+        vkWaitForFences(m_VulkanDevice, 0, &fence, VK_TRUE, UINT64_MAX);
+
+        vkDestroyCommandPool(m_VulkanDevice, commandPool, VK_NULL_HANDLE);
+        vkDestroyFence(m_VulkanDevice, fence, VK_NULL_HANDLE);
     }
 
 }  // namespace aga
