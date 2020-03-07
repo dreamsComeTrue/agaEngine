@@ -7,18 +7,22 @@
 
 namespace aga
 {
+    class PlatformWindow;
+
     class VulkanRenderer
     {
     public:
         VulkanRenderer();
         ~VulkanRenderer();
 
-        void RenderFrame();
+        bool Initialize(PlatformWindow *window);
+        void Destroy();
+
+        bool RenderFrame();
+
+        void CreateCommandPool();
 
     private:
-        void _Initialize();
-        void _Destroy();
-
         bool _InitInstance();
         void _DestroyInstance();
 
@@ -28,9 +32,8 @@ namespace aga
         bool _InitDebugging();
         bool _DestroyDebugging();
 
-        void _CreateCommandPool();
-
     private:
+        PlatformWindow *m_PlatformWindow;
         VkInstance m_VulkanInstance;
         VkDevice m_VulkanDevice;
         VkPhysicalDevice m_VulkanPhysicalDevice;

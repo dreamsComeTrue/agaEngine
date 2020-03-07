@@ -21,11 +21,9 @@ namespace aga
 
     MainLoop::~MainLoop()
     {
-        DestroyRenderer();
-        DestroyWindow();
     }
 
-    bool MainLoop::InitializeWindow(const char* title, size_t width, size_t height)
+    bool MainLoop::InitializeWindow(const char *title, size_t width, size_t height)
     {
 #if defined(_WIN32)
         m_PlatformWindow = new WindowsPlatformWindow();
@@ -38,25 +36,26 @@ namespace aga
 
     void MainLoop::DestroyWindow()
     {
+        m_PlatformWindow->Destroy();
         SAFE_DELETE(m_PlatformWindow);
     }
 
     bool MainLoop::InitializeRenderer()
     {
         m_Renderer = new VulkanRenderer();
+        m_Renderer->Initialize(m_PlatformWindow);
 
         return true;
     }
 
     void MainLoop::DestroyRenderer()
     {
+        m_Renderer->Destroy();
         SAFE_DELETE(m_Renderer);
     }
 
     bool MainLoop::Iterate() const
     {
-        m_Renderer->RenderFrame();
-
-        return true;
+        return m_Renderer->RenderFrame();
     }
 }  // namespace aga

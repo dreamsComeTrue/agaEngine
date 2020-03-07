@@ -5,6 +5,7 @@
 #include "core/Common.h"
 #include "core/Logger.h"
 #include "core/Typedefs.h"
+#include "platform/PlatformWindow.h"
 
 namespace aga
 {
@@ -46,6 +47,7 @@ namespace aga
     PFN_vkDestroyDebugReportCallbackEXT destroDebugReportCallbackEXTFunc = VK_NULL_HANDLE;
 
     VulkanRenderer::VulkanRenderer() :
+        m_PlatformWindow(nullptr),
         m_VulkanInstance(VK_NULL_HANDLE),
         m_VulkanDevice(VK_NULL_HANDLE),
         m_VulkanPhysicalDevice(VK_NULL_HANDLE),
@@ -53,37 +55,44 @@ namespace aga
         m_Queue(VK_NULL_HANDLE),
         m_DebugReport(VK_NULL_HANDLE)
     {
-        _Initialize();
-        _CreateCommandPool();
     }
 
     VulkanRenderer::~VulkanRenderer()
     {
-        _Destroy();
     }
 
-    void VulkanRenderer::RenderFrame()
+    bool VulkanRenderer::RenderFrame()
     {
+        if (m_PlatformWindow)
+        {
+            return m_PlatformWindow->Update();
+        }
+        
+        return false;
     }
 
-    void VulkanRenderer::_Initialize()
+    bool VulkanRenderer::Initialize(PlatformWindow *window)
     {
+        m_PlatformWindow = window;
+
         if (!_InitInstance())
         {
-            return;
+            return false;
         }
 
         if (!_InitDevice())
         {
-            return;
+            return false;
         }
 
 #if BUILD_ENABLE_VULKAN_DEBUG
         _InitDebugging();
 #endif
+
+        return true;
     }
 
-    void VulkanRenderer::_Destroy()
+    void VulkanRenderer::Destroy()
     {
         _DestroyDevice();
 
@@ -330,7 +339,7 @@ namespace aga
         return true;
     }
 
-    void VulkanRenderer::_CreateCommandPool()
+    void VulkanRenderer::CreateCommandPool()
     {
         VkCommandPoolCreateInfo poolCreateInfo = {};
         poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;

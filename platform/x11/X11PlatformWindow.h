@@ -15,8 +15,13 @@ namespace aga
         X11PlatformWindow();
         ~X11PlatformWindow();
 
-        bool Initialize(const char* title, uint32_t width = 1024, uint32_t height = 768) override;
+        bool Initialize(const char *title, uint32_t width = 1024, uint32_t height = 768) override;
         void Destroy() override;
+
+        bool Update() override;
+
+    private:
+        void _HandleEvent(const xcb_generic_event_t *event);
 
     private:
         xcb_connection_t *m_XCBConnection;

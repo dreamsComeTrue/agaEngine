@@ -22,7 +22,8 @@ int main(int argc, char *argv[])
             exit(-1);
         }
 
-        mainLoop.Iterate();
+        while (mainLoop.Iterate())
+            ;
 
         mainLoop.DestroyRenderer();
         mainLoop.DestroyWindow();
