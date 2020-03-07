@@ -36,8 +36,10 @@ namespace aga
         String &operator=(const String &s);
 
         String &operator+=(const String &s);
-        
-        const char* GetData();
+
+        const char *GetData();
+
+        operator const char *() const;
 
         friend String operator+(const String &lhs, const String &rhs);
         friend String operator+(const String &lhs, char rhs);

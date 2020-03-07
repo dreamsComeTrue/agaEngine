@@ -2,6 +2,10 @@
 
 #pragma once
 
+#include <stddef.h>
+
+typedef unsigned int uint32_t;
+
 #define ENGINE_NAME "agaEngine"
 #define ENGINE_VERSION_MAJOR 0
 #define ENGINE_VERSION_MINOR 1

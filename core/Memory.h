@@ -4,6 +4,7 @@
 
 #include "Logger.h"
 #include "Common.h"
+#include "Typedefs.h"
 
 #include <memory>
 

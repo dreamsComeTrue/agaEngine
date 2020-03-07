@@ -3,8 +3,7 @@
 #pragma once
 
 #include "core/Common.h"
-
-#include <vulkan/vulkan.h>
+#include "platform/Platform.h"
 
 namespace aga
 {

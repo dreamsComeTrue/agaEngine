@@ -1,12 +1,15 @@
 // Copyright (C) 2020 Dominik 'dreamsComeTrue' Jasiński
 
 #include "VulkanRenderer.h"
+#include "core/BuildConfig.h"
 #include "core/Common.h"
 #include "core/Logger.h"
 #include "core/Typedefs.h"
 
 namespace aga
 {
+    const std::vector<const char *> g_ValidationLayers = {"VK_LAYER_LUNARG_standard_validation"};
+
     VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(VkDebugReportFlagsEXT flags,
                                                        VkDebugReportObjectTypeEXT objectType,
                                                        uint64_t sourceObject, size_t location,
@@ -75,18 +78,24 @@ namespace aga
             return;
         }
 
+#if BUILD_ENABLE_VULKAN_DEBUG
         _InitDebugging();
+#endif
     }
 
     void VulkanRenderer::_Destroy()
     {
         _DestroyDevice();
+
+#if BUILD_ENABLE_VULKAN_DEBUG
         _DestroyDebugging();
+#endif
         _DestroyInstance();
     }
 
     bool VulkanRenderer::_InitInstance()
     {
+#if BUILD_ENABLE_VULKAN_DEBUG
         m_DebugCallbackCreateInfo = {};
         m_DebugCallbackCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT;
         m_DebugCallbackCreateInfo.pfnCallback = VulkanDebugCallback;
@@ -94,9 +103,14 @@ namespace aga
             VK_DEBUG_REPORT_INFORMATION_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT |
             VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT |
             VK_DEBUG_REPORT_DEBUG_BIT_EXT;
+#endif
 
-        m_InstanceLayers.push_back("VK_LAYER_LUNARG_standard_validation");
-        m_DeviceLayers.push_back("VK_LAYER_LUNARG_standard_validation");
+        for (const char *layer : g_ValidationLayers)
+        {
+            m_InstanceLayers.push_back(layer);
+            m_DeviceLayers.push_back(layer);
+        }
+
         m_InstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 
         VkApplicationInfo applicationInfo = {};
@@ -106,6 +120,7 @@ namespace aga
             VK_MAKE_VERSION(ENGINE_VERSION_MAJOR, ENGINE_VERSION_MINOR, ENGINE_VERSION_PATCH);
         applicationInfo.applicationVersion =
             VK_MAKE_VERSION(ENGINE_VERSION_MAJOR, ENGINE_VERSION_MINOR, ENGINE_VERSION_PATCH);
+        applicationInfo.pEngineName = ENGINE_NAME;
         applicationInfo.pApplicationName = ENGINE_NAME;
 
         VkInstanceCreateInfo instanceCreateInfo = {};
@@ -115,7 +130,9 @@ namespace aga
         instanceCreateInfo.ppEnabledLayerNames = m_InstanceLayers.data();
         instanceCreateInfo.enabledExtensionCount = m_InstanceExtensions.size();
         instanceCreateInfo.ppEnabledExtensionNames = m_InstanceExtensions.data();
+#if BUILD_ENABLE_VULKAN_DEBUG
         instanceCreateInfo.pNext = &m_DebugCallbackCreateInfo;
+#endif
 
         VkResult result = vkCreateInstance(&instanceCreateInfo, VK_NULL_HANDLE, &m_VulkanInstance);
 
@@ -275,6 +292,7 @@ namespace aga
 
     bool VulkanRenderer::_InitDebugging()
     {
+#if BUILD_ENABLE_VULKAN_DEBUG
         createDebugReportCallbackEXTFunc =
             (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(
                 m_VulkanInstance, "vkCreateDebugReportCallbackEXT");
@@ -295,16 +313,19 @@ namespace aga
                                          VK_NULL_HANDLE, &m_DebugReport);
 
         LOG_DEBUG_F("Vulkan debugging enabled\n");
+#endif
 
         return true;
     }
 
     bool VulkanRenderer::_DestroyDebugging()
     {
+#if BUILD_ENABLE_VULKAN_DEBUG
         destroDebugReportCallbackEXTFunc(m_VulkanInstance, m_DebugReport, VK_NULL_HANDLE);
         m_DebugReport = VK_NULL_HANDLE;
 
         LOG_DEBUG_F("Vulkan debugging destroyed\n");
+#endif
 
         return true;
     }
@@ -345,28 +366,25 @@ namespace aga
         }
         vkEndCommandBuffer(commandBuffer);
 
+        VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+        semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        VkSemaphore semaphore;
+        vkCreateSemaphore(m_VulkanDevice, &semaphoreCreateInfo, VK_NULL_HANDLE, &semaphore);
+
         VkSubmitInfo submitInfo = {};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &commandBuffer;
+        // submitInfo.waitSemaphoreCount = 1;
+        // submitInfo.pWaitSemaphores = &semaphore;
+        // submitInfo.pWaitDstStageMask = 0;
 
-        VkFenceCreateInfo fenceCreateInfo = {};
-        fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-
-        VkFence fence;
-        vkCreateFence(m_VulkanDevice, &fenceCreateInfo, VK_NULL_HANDLE, &fence);
-        
-        VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-        semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        
-        VkSemaphore semaphore;
-        vkCreateSemaphore(m_VulkanDevice, &semaphoreCreateInfo, VK_NULL_HANDLE, &semaphore);
-
-        vkQueueSubmit(m_Queue, 1, &submitInfo, fence);
-        vkWaitForFences(m_VulkanDevice, 0, &fence, VK_TRUE, UINT64_MAX);
+        vkQueueSubmit(m_Queue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueWaitIdle(m_Queue);
 
         vkDestroyCommandPool(m_VulkanDevice, commandPool, VK_NULL_HANDLE);
-        vkDestroyFence(m_VulkanDevice, fence, VK_NULL_HANDLE);
+        vkDestroySemaphore(m_VulkanDevice, semaphore, VK_NULL_HANDLE);
     }
 
 }  // namespace aga

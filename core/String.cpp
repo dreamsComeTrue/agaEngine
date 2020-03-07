@@ -54,14 +54,17 @@ namespace aga
 
     String::String()
     {
-        m_Length = 0;
-        m_Data = new char[0];
+        m_Length = 1;
+        m_Data = new char[m_Length];
+        m_Data[m_Length - 1] = '\0';
     }
 
     String::String(char c)
     {
-        m_Length = 1;
-        m_Data = new char(c);
+        m_Length = 2;
+        m_Data = new char[m_Length];
+        m_Data[0] = c;
+        m_Data[m_Length - 1] = '\0';
     }
 
     String::String(uint32_t c)
@@ -75,13 +78,15 @@ namespace aga
             i++;
         }
 
-        m_Length = i;
-        m_Data = new char[i];
+        m_Length = i + 1;
+        m_Data = new char[m_Length];
 
         for (uint32_t j = 0; j < i; j++)
         {
             m_Data[j] = dest[j];
         }
+        
+        m_Data[m_Length - 1] = '\0';
     }
 
     String::String(const char *c)
@@ -95,8 +100,8 @@ namespace aga
                 n++;
             }
 
-            m_Length = n;
-            m_Data = new char[n];
+            m_Length = n + 1;
+            m_Data = new char[m_Length];
 
             for (uint32_t j = 0; j < n; j++)
             {
@@ -105,20 +110,24 @@ namespace aga
         }
         else
         {
-            m_Length = 0;
-            m_Data = new char[0];
+            m_Length = 1;
+            m_Data = new char[m_Length];
         }
+        
+        m_Data[m_Length - 1] = '\0';
     }
 
     String::String(const String &s)
     {
-        m_Length = s.Length();
+        m_Length = s.Length() + 1;
         m_Data = new char[m_Length];
 
-        for (uint32_t j = 0; j < m_Length; j++)
+        for (uint32_t j = 0; j < m_Length - 1; j++)
         {
             m_Data[j] = s[j];
         }
+        
+        m_Data[m_Length - 1] = '\0';
     }
 
     String::~String()
@@ -129,7 +138,7 @@ namespace aga
 
     uint32_t String::Length() const
     {
-        return m_Length;
+        return m_Length - 1;
     }
 
     int String::IndexOf(char c) const
@@ -244,13 +253,15 @@ namespace aga
 
         SAFE_DELETE_ARRAY(m_Data);
 
-        m_Length = s.Length();
+        m_Length = s.Length() + 1;
         m_Data = new char[m_Length];
 
-        for (uint32_t j = 0; j < m_Length; j++)
+        for (uint32_t j = 0; j < m_Length - 1; j++)
         {
             m_Data[j] = s[j];
         }
+        
+        m_Data[m_Length - 1] = '\0';
 
         return *this;
     }
@@ -260,25 +271,31 @@ namespace aga
         return m_Data;
     }
 
+    String::operator const char *() const
+    {
+        return m_Data;
+    }
+
     String &String::operator+=(const String &s)
     {
         uint32_t len = m_Length + s.Length();
         char *str = new char[len];
 
-        for (uint32_t j = 0; j < m_Length; j++)
+        for (uint32_t j = 0; j < m_Length - 1; j++)
         {
             str[j] = m_Data[j];
         }
 
         for (uint32_t i = 0; i < s.Length(); i++)
         {
-            str[m_Length + i] = s[i];
+            str[m_Length - 1 + i] = s[i];
         }
 
         SAFE_DELETE_ARRAY(m_Data);
 
         m_Length = len;
         m_Data = str;
+        m_Data[m_Length - 1] = '\0';
 
         return *this;
     }
