@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include <iostream>
+#include "Common.h"
 
 namespace aga
 {
@@ -36,6 +36,8 @@ namespace aga
         String &operator=(const String &s);
 
         String &operator+=(const String &s);
+        
+        const char* GetData();
 
         friend String operator+(const String &lhs, const String &rhs);
         friend String operator+(const String &lhs, char rhs);

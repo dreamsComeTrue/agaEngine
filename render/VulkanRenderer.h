@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "core/Common.h"
+
 #include <vulkan/vulkan.h>
 
 namespace aga
@@ -20,13 +22,25 @@ namespace aga
 
         bool _InitInstance();
         void _DestroyInstance();
-        
+
         bool _InitDevice();
         void _DestroyDevice();
 
+        bool _InitDebugging();
+        bool _DestroyDebugging();
+
     private:
-        VkInstance m_VulkanInstance;        
+        VkInstance m_VulkanInstance;
         VkDevice m_VulkanDevice;
         VkPhysicalDevice m_VulkanPhysicalDevice;
+
+        std::vector<const char *> m_InstanceLayers;
+        std::vector<const char *> m_InstanceExtensions;
+
+        std::vector<const char *> m_DeviceLayers;
+        std::vector<const char *> m_DeviceExtensions;
+
+        VkDebugReportCallbackEXT m_DebugReport;
+        VkDebugReportCallbackCreateInfoEXT m_DebugCallbackCreateInfo;
     };
 }  // namespace aga

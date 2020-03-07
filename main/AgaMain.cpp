@@ -16,7 +16,5 @@ int main(int argc, char *argv[])
 
     LOG_DEBUG("Finishing agaEngine\n");
 
-    aga::MemoryTracker::getInstance().PrintStatistics();
-
     return 0;
 }

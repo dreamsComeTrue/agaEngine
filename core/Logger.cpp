@@ -1,9 +1,9 @@
 // Copyright (C) 2020 Dominik 'dreamsComeTrue' Jasiński
 
 #include "Logger.h"
+#include "Common.h"
 
 #include <chrono>
-#include <iostream>
 
 namespace aga
 {

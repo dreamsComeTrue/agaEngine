@@ -3,10 +3,9 @@
 #pragma once
 
 #include "Logger.h"
+#include "Common.h"
 
-#include <iostream>
 #include <memory>
-#include <stdlib.h>
 
 namespace aga
 {
@@ -45,28 +44,28 @@ namespace aga
 
 void *operator new(size_t size)
 {
-    aga::MemoryTracker::getInstance().IncreaseAllocationsCount(1);
+    //   aga::MemoryTracker::getInstance().IncreaseAllocationsCount(1);
 
     return std::malloc(size);
 }
 
 void *operator new[](size_t size)
 {
-    aga::MemoryTracker::getInstance().IncreaseAllocationsCount(1);
+    //  aga::MemoryTracker::getInstance().IncreaseAllocationsCount(1);
 
     return std::malloc(size);
 }
 
 void operator delete(void *memory)
 {
-    aga::MemoryTracker::getInstance().IncreaseAllocationsCount(-1);
+    //   aga::MemoryTracker::getInstance().IncreaseAllocationsCount(-1);
 
     std::free(memory);
 }
 
 void operator delete[](void *memory)
 {
-    aga::MemoryTracker::getInstance().IncreaseAllocationsCount(-1);
+    //   aga::MemoryTracker::getInstance().IncreaseAllocationsCount(-1);
 
     std::free(memory);
 }

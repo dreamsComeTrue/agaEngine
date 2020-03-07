@@ -3,7 +3,6 @@
 #include "String.h"
 #include "Macros.h"
 
-#include <cstring>
 #include <limits.h>
 
 namespace aga
@@ -254,6 +253,11 @@ namespace aga
         }
 
         return *this;
+    }
+
+    const char *String::GetData()
+    {
+        return m_Data;
     }
 
     String &String::operator+=(const String &s)
