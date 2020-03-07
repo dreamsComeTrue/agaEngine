@@ -7,7 +7,7 @@
 namespace aga
 {
     class VulkanRenderer;
-    class PlatformWindow;
+    class PlatformWindowBase;
 
     class MainLoop
     {
@@ -15,16 +15,16 @@ namespace aga
         MainLoop();
         ~MainLoop();
 
+        bool InitializeRenderer();
+        void DestroyRenderer();
+
         bool InitializeWindow(const char* title, size_t width = 1024, size_t height = 768);
         void DestroyWindow();
 
-        bool InitializeRenderer();
-        void DestroyRenderer();
-        
         bool Iterate() const;
 
     private:
         VulkanRenderer *m_Renderer;
-        PlatformWindow *m_PlatformWindow;
+        PlatformWindowBase *m_PlatformWindowBase;
     };
 }  // namespace aga

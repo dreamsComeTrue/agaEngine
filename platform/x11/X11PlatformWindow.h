@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "platform/Platform.h"
 #include "platform/PlatformWindow.h"
 
 #define VK_USE_PLATFORM_XCB_KHR 1
@@ -9,7 +10,7 @@
 
 namespace aga
 {
-    class X11PlatformWindow : public PlatformWindow
+    class X11PlatformWindow : public PlatformWindowBase
     {
     public:
         X11PlatformWindow();
@@ -20,7 +21,9 @@ namespace aga
 
         bool Update() override;
 
-    private:
+        void CreateVulkanSurface() override;
+        void DestroyVulkanSurface() override;
+
         void _HandleEvent(const xcb_generic_event_t *event);
 
     private:
@@ -28,5 +31,6 @@ namespace aga
         xcb_screen_t *m_XCBScreen;
         xcb_window_t m_XCBWindow;
         xcb_intern_atom_reply_t *m_XCBAtomWindowReply;
+        VkSurfaceKHR m_VulkanSurface;
     };
 }  // namespace aga

@@ -4,7 +4,7 @@
 
 namespace aga
 {
-    WindowsPlatformWindow::WindowsPlatformWindow()
+    WindowsPlatformWindow::WindowsPlatformWindow() 
     {
     }
 

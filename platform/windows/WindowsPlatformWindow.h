@@ -6,7 +6,7 @@
 
 namespace aga
 {
-    class WindowsPlatformWindow : PlatformWindow
+    class WindowsPlatformWindow : PlatformWindowBase
     {
     public:
         WindowsPlatformWindow();

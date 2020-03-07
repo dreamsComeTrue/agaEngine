@@ -2,20 +2,15 @@
 
 #include "MainLoop.h"
 #include "core/Macros.h"
+#include "platform/PlatformWindow.h"
 #include "render/VulkanRenderer.h"
 
-#if defined(_WIN32)
-#include "platform/windows/WindowsPlatformWindow.h"
-#elif defined(__linux)
-#include "platform/x11/X11PlatformWindow.h"
-#else
-// platform not yet supported
-#error Platform not yet supported
-#endif
+#include <chrono>
+#include <thread>
 
 namespace aga
 {
-    MainLoop::MainLoop() : m_Renderer(nullptr), m_PlatformWindow(nullptr)
+    MainLoop::MainLoop() : m_Renderer(nullptr), m_PlatformWindowBase(nullptr)
     {
     }
 
@@ -23,27 +18,10 @@ namespace aga
     {
     }
 
-    bool MainLoop::InitializeWindow(const char *title, size_t width, size_t height)
-    {
-#if defined(_WIN32)
-        m_PlatformWindow = new WindowsPlatformWindow();
-#elif defined(__linux)
-        m_PlatformWindow = new X11PlatformWindow();
-#endif
-
-        return m_PlatformWindow->Initialize(title, width, height);
-    }
-
-    void MainLoop::DestroyWindow()
-    {
-        m_PlatformWindow->Destroy();
-        SAFE_DELETE(m_PlatformWindow);
-    }
-
     bool MainLoop::InitializeRenderer()
     {
         m_Renderer = new VulkanRenderer();
-        m_Renderer->Initialize(m_PlatformWindow);
+        m_Renderer->Initialize();
 
         return true;
     }
@@ -54,8 +32,33 @@ namespace aga
         SAFE_DELETE(m_Renderer);
     }
 
+    bool MainLoop::InitializeWindow(const char *title, size_t width, size_t height)
+    {
+        m_PlatformWindowBase = PlatformWindow::getInstance();
+        bool result = m_PlatformWindowBase->Initialize(title, width, height);
+
+        if (result)
+        {
+            m_PlatformWindowBase->SetRenderer(m_Renderer);
+            m_Renderer->SetPlatformWindow(m_PlatformWindowBase);
+            m_PlatformWindowBase->CreateVulkanSurface();
+        }
+
+        return result;
+    }
+
+    void MainLoop::DestroyWindow()
+    {
+        m_PlatformWindowBase->DestroyVulkanSurface();
+        m_PlatformWindowBase->Destroy();
+        SAFE_DELETE(m_PlatformWindowBase);
+    }
+
     bool MainLoop::Iterate() const
     {
+        //  TODO: Low CPU usage mode
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
         return m_Renderer->RenderFrame();
     }
 }  // namespace aga

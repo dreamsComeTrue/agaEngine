@@ -12,12 +12,12 @@ int main(int argc, char *argv[])
     {
         aga::MainLoop mainLoop;
 
-        if (!mainLoop.InitializeWindow(title))
+        if (!mainLoop.InitializeRenderer())
         {
             exit(-1);
         }
 
-        if (!mainLoop.InitializeRenderer())
+        if (!mainLoop.InitializeWindow(title))
         {
             exit(-1);
         }
@@ -25,8 +25,8 @@ int main(int argc, char *argv[])
         while (mainLoop.Iterate())
             ;
 
-        mainLoop.DestroyRenderer();
         mainLoop.DestroyWindow();
+        mainLoop.DestroyRenderer();
     }
 
     LOG_DEBUG("Finishing agaEngine\n");

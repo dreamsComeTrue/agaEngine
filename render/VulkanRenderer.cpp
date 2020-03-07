@@ -67,14 +67,12 @@ namespace aga
         {
             return m_PlatformWindow->Update();
         }
-        
+
         return false;
     }
 
-    bool VulkanRenderer::Initialize(PlatformWindow *window)
+    bool VulkanRenderer::Initialize()
     {
-        m_PlatformWindow = window;
-
         if (!_InitInstance())
         {
             return false;
@@ -102,6 +100,11 @@ namespace aga
         _DestroyInstance();
     }
 
+    void VulkanRenderer::SetPlatformWindow(PlatformWindowBase *window)
+    {
+        m_PlatformWindow = window;
+    }
+
     bool VulkanRenderer::_InitInstance()
     {
 #if BUILD_ENABLE_VULKAN_DEBUG
@@ -121,6 +124,7 @@ namespace aga
         }
 
         m_InstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+        m_InstanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
 
         VkApplicationInfo applicationInfo = {};
         applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -394,6 +398,11 @@ namespace aga
 
         vkDestroyCommandPool(m_VulkanDevice, commandPool, VK_NULL_HANDLE);
         vkDestroySemaphore(m_VulkanDevice, semaphore, VK_NULL_HANDLE);
+    }
+
+    const VkInstance VulkanRenderer::GetVulkanInstance()
+    {
+        return m_VulkanInstance;
     }
 
 }  // namespace aga

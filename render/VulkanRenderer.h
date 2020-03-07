@@ -2,12 +2,11 @@
 
 #pragma once
 
-#include "core/Common.h"
 #include "platform/Platform.h"
 
 namespace aga
 {
-    class PlatformWindow;
+    class PlatformWindowBase;
 
     class VulkanRenderer
     {
@@ -15,12 +14,16 @@ namespace aga
         VulkanRenderer();
         ~VulkanRenderer();
 
-        bool Initialize(PlatformWindow *window);
+        bool Initialize();
         void Destroy();
+        
+        void SetPlatformWindow(PlatformWindowBase *window);
 
         bool RenderFrame();
 
         void CreateCommandPool();
+        
+        const VkInstance GetVulkanInstance();
 
     private:
         bool _InitInstance();
@@ -33,7 +36,7 @@ namespace aga
         bool _DestroyDebugging();
 
     private:
-        PlatformWindow *m_PlatformWindow;
+        PlatformWindowBase *m_PlatformWindow;
         VkInstance m_VulkanInstance;
         VkDevice m_VulkanDevice;
         VkPhysicalDevice m_VulkanPhysicalDevice;

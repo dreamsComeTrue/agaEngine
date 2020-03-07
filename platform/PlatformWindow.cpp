@@ -2,18 +2,43 @@
 
 #include "PlatformWindow.h"
 
+#if defined(_WIN32)
+#include "platform/windows/WindowsPlatformWindow.h"
+#elif defined(__linux)
+#include "platform/x11/X11PlatformWindow.h"
+#else
+// platform not yet supported
+#error Platform not yet supported
+#endif
+
 namespace aga
 {
-    PlatformWindow::PlatformWindow()
+    PlatformWindowBase::PlatformWindowBase() : m_Renderer(nullptr), m_ShouldRun(true)
     {
     }
 
-    PlatformWindow::~PlatformWindow()
+    PlatformWindowBase::~PlatformWindowBase()
     {
     }
 
-    void PlatformWindow::Close()
+    void PlatformWindowBase::Close()
     {
         m_ShouldRun = false;
+    }
+
+    void PlatformWindowBase::SetRenderer(VulkanRenderer *renderer)
+    {
+        m_Renderer = renderer;
+    }
+
+#if defined(_WIN32)
+    PlatformWindowBase *PlatformWindow::s_PLatformWindowBase = new X11PlatformWindow();
+#elif defined(__linux)
+    PlatformWindowBase *PlatformWindow::s_PLatformWindowBase = new X11PlatformWindow();
+#endif
+
+    PlatformWindowBase *PlatformWindow::getInstance()
+    {
+        return s_PLatformWindowBase;
     }
 }  // namespace aga

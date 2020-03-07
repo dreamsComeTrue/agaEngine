@@ -3,6 +3,7 @@
 #include "X11PlatformWindow.h"
 #include "core/Logger.h"
 #include "platform/Platform.h"
+#include "render/VulkanRenderer.h"
 
 namespace aga
 {
@@ -10,7 +11,8 @@ namespace aga
         m_XCBConnection(nullptr),
         m_XCBScreen(nullptr),
         m_XCBWindow(0),
-        m_XCBAtomWindowReply(nullptr)
+        m_XCBAtomWindowReply(nullptr),
+        m_VulkanSurface(VK_NULL_HANDLE)
     {
     }
 
@@ -99,14 +101,6 @@ namespace aga
         xcb_configure_window(m_XCBConnection, m_XCBWindow,
                              XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y, coords);
         xcb_flush(m_XCBConnection);
-
-        xcb_generic_event_t *e;
-        while ((e = xcb_wait_for_event(m_XCBConnection)))
-        {
-            LOG_INFO("event");
-            if ((e->response_type & ~0x80) == XCB_EXPOSE)
-                break;
-        }
 
         LOG_INFO("Initialized X11PlatformWindow [" + String(width) + "x" + String(height) + "]\n");
 
@@ -240,6 +234,27 @@ namespace aga
             default:
                 break;
         }
+    }
+
+    void X11PlatformWindow::CreateVulkanSurface()
+    {
+        VkXcbSurfaceCreateInfoKHR surfaceCreateInfo = {};
+        surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+        surfaceCreateInfo.connection = m_XCBConnection;
+        surfaceCreateInfo.window = m_XCBWindow;
+
+        vkCreateXcbSurfaceKHR(m_Renderer->GetVulkanInstance(), &surfaceCreateInfo, nullptr,
+                              &m_VulkanSurface);
+
+        LOG_DEBUG_F("X11PlatformWindow Vulkan Surface created\n");
+    }
+
+    void X11PlatformWindow::DestroyVulkanSurface()
+    {
+        vkDestroySurfaceKHR(m_Renderer->GetVulkanInstance(), m_VulkanSurface, nullptr);
+        m_VulkanSurface = VK_NULL_HANDLE;
+
+        LOG_DEBUG_F("X11PlatformWindow Vulkan Surface destroyed\n");
     }
 
 }  // namespace aga

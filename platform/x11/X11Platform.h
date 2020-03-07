@@ -2,12 +2,18 @@
 
 #pragma once
 
+#include "platform/Platform.h"
+
 namespace aga
 {
-    class X11Platform
+    class X11Platform : public PlatformBase
     {
     public:
         X11Platform();
         ~X11Platform();
+
+        void Initialize() override;
+
+        std::vector<const char *> GetRequiredExtensions() override;
     };
 }  // namespace aga
