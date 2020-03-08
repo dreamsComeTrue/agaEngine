@@ -21,6 +21,7 @@ namespace aga
         m_VulkanSurface(VK_NULL_HANDLE),
         m_SwapChain(VK_NULL_HANDLE),
         m_SwapChainImageCount(2),
+        m_RenderPass(VK_NULL_HANDLE),
         m_DepthStencilImage(VK_NULL_HANDLE),
         m_DepthStencilImageView(VK_NULL_HANDLE),
         m_DepthStencilImageMemory(VK_NULL_HANDLE),
@@ -368,6 +369,68 @@ namespace aga
         m_DepthStencilImage = VK_NULL_HANDLE;
 
         LOG_DEBUG_F("X11PlatformWindow DepthStencil Image destroyed\n");
+    }
+
+    bool PlatformWindowBase::CreateRenderPass()
+    {
+        std::array<VkAttachmentDescription, 2> attachments = {};
+        attachments[0].flags = 0;
+        attachments[0].format = m_DepthStencilFormat;
+        attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[0].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        attachments[1].flags = 0;
+        attachments[1].format = m_SurfaceFormat.format;
+        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[1].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        std::array<VkAttachmentReference, 1> subPass0ColorAttachments = {};
+        subPass0ColorAttachments[0].attachment = 1;
+        subPass0ColorAttachments[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkAttachmentReference subPass0DepthStencilAttachment = {};
+        subPass0DepthStencilAttachment.attachment = 0;
+        subPass0DepthStencilAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        std::array<VkSubpassDescription, 1> subPasses = {};
+        subPasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subPasses[0].colorAttachmentCount = subPass0ColorAttachments.size();
+        subPasses[0].pColorAttachments = subPass0ColorAttachments.data();
+        subPasses[0].pDepthStencilAttachment = &subPass0DepthStencilAttachment;
+
+        VkRenderPassCreateInfo renderPassCreateInfo = {};
+        renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        renderPassCreateInfo.attachmentCount = attachments.size();
+        renderPassCreateInfo.pAttachments = attachments.data();
+        renderPassCreateInfo.subpassCount = subPasses.size();
+        renderPassCreateInfo.pSubpasses = subPasses.data();
+
+        if (vkCreateRenderPass(m_Renderer->GetVulkanDevice(), &renderPassCreateInfo, VK_NULL_HANDLE,
+                               &m_RenderPass) != VK_SUCCESS)
+        {
+            LOG_ERROR_F("X11PlatformWindow Error while creating RenderPass\n");
+
+            return false;
+        }
+
+        LOG_DEBUG_F("X11PlatformWindow RenderPass created\n");
+
+        return true;
+    }
+
+    void PlatformWindowBase::DestroyRenderPass()
+    {
+        vkDestroyRenderPass(m_Renderer->GetVulkanDevice(), m_RenderPass, VK_NULL_HANDLE);
+
+        LOG_DEBUG_F("X11PlatformWindow RenderPass destroyed\n");
     }
 
     uint32_t PlatformWindowBase::FindMemoryTypeIndex(

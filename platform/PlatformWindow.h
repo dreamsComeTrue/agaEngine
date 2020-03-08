@@ -37,6 +37,9 @@ namespace aga
 
         bool CreateDepthStencilImage();
         void DestroyDepthStencilImage();
+        
+        bool CreateRenderPass();
+        void DestroyRenderPass();
 
         uint32_t FindMemoryTypeIndex(const VkPhysicalDeviceMemoryProperties *memoryProperties,
                                      const VkMemoryRequirements *memoryRequirements,
@@ -62,6 +65,8 @@ namespace aga
 
         VkSwapchainKHR m_SwapChain;
         uint32_t m_SwapChainImageCount;
+        
+        VkRenderPass m_RenderPass;
 
         std::vector<VkImage> m_SwapChainImages;
         std::vector<VkImageView> m_SwapChainImagesViews;

@@ -47,7 +47,10 @@ namespace aga
                 {
                     if (m_PlatformWindowBase->CreateSwapChainImages())
                     {
-                        return m_PlatformWindowBase->CreateDepthStencilImage();
+                        if (m_PlatformWindowBase->CreateDepthStencilImage())
+                        {
+                            return m_PlatformWindowBase->CreateRenderPass();
+                        }
                     }
                 }
             }
