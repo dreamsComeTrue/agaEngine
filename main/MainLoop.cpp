@@ -41,7 +41,8 @@ namespace aga
         {
             m_PlatformWindowBase->SetRenderer(m_Renderer);
             m_Renderer->SetPlatformWindow(m_PlatformWindowBase);
-            m_PlatformWindowBase->CreateVulkanSurface();
+
+            return m_PlatformWindowBase->CreateVulkanSurface();
         }
 
         return result;

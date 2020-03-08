@@ -13,7 +13,10 @@
 
 namespace aga
 {
-    PlatformWindowBase::PlatformWindowBase() : m_Renderer(nullptr), m_ShouldRun(true)
+    PlatformWindowBase::PlatformWindowBase() :
+        m_Renderer(nullptr),
+        m_ShouldRun(true),
+        m_VulkanSurface(VK_NULL_HANDLE)
     {
     }
 

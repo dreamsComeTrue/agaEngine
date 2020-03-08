@@ -11,8 +11,7 @@ namespace aga
         m_XCBConnection(nullptr),
         m_XCBScreen(nullptr),
         m_XCBWindow(0),
-        m_XCBAtomWindowReply(nullptr),
-        m_VulkanSurface(VK_NULL_HANDLE)
+        m_XCBAtomWindowReply(nullptr)
     {
     }
 
@@ -236,7 +235,7 @@ namespace aga
         }
     }
 
-    void X11PlatformWindow::CreateVulkanSurface()
+    bool X11PlatformWindow::CreateVulkanSurface()
     {
         VkXcbSurfaceCreateInfoKHR surfaceCreateInfo = {};
         surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
@@ -246,7 +245,37 @@ namespace aga
         vkCreateXcbSurfaceKHR(m_Renderer->GetVulkanInstance(), &surfaceCreateInfo, nullptr,
                               &m_VulkanSurface);
 
+        VkPhysicalDevice device = m_Renderer->GetPhysicalDevice();
+
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, m_VulkanSurface, &m_SurfaceCapabilities);
+        {
+            uint32_t formatCount = 0;
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_VulkanSurface, &formatCount, nullptr);
+            std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_VulkanSurface, &formatCount,
+                                                 surfaceFormats.data());
+
+            if (formatCount == 0)
+            {
+                LOG_ERROR_F("X11PlatformWindow Surface format missing\n");
+
+                return false;
+            }
+
+            if (surfaceFormats[0].format == VK_FORMAT_UNDEFINED)
+            {
+                m_SurfaceFormat.format = VK_FORMAT_R8G8B8A8_UNORM;
+                m_SurfaceFormat.colorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
+            }
+            else
+            {
+                m_SurfaceFormat = surfaceFormats[0];
+            }
+        }
+
         LOG_DEBUG_F("X11PlatformWindow Vulkan Surface created\n");
+
+        return true;
     }
 
     void X11PlatformWindow::DestroyVulkanSurface()

@@ -414,4 +414,8 @@ namespace aga
         return m_VulkanInstance;
     }
 
+    const VkPhysicalDevice VulkanRenderer::GetPhysicalDevice()
+    {
+        return m_VulkanPhysicalDevice;
+    }
 }  // namespace aga

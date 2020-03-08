@@ -4,6 +4,7 @@
 
 #include "core/String.h"
 #include "core/Typedefs.h"
+#include "platform/Platform.h"
 
 namespace aga
 {
@@ -25,7 +26,7 @@ namespace aga
 
         void SetRenderer(VulkanRenderer *renderer);
 
-        virtual void CreateVulkanSurface() = 0;
+        virtual bool CreateVulkanSurface() = 0;
         virtual void DestroyVulkanSurface() = 0;
 
     protected:
@@ -34,6 +35,10 @@ namespace aga
         uint32_t m_Width;
         uint32_t m_Height;
         bool m_ShouldRun;
+
+        VkSurfaceKHR m_VulkanSurface;
+        VkSurfaceCapabilitiesKHR m_SurfaceCapabilities;
+        VkSurfaceFormatKHR m_SurfaceFormat;
     };
 
     class PlatformWindow

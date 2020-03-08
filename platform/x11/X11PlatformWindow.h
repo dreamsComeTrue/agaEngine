@@ -21,7 +21,7 @@ namespace aga
 
         bool Update() override;
 
-        void CreateVulkanSurface() override;
+        bool CreateVulkanSurface() override;
         void DestroyVulkanSurface() override;
 
         void _HandleEvent(const xcb_generic_event_t *event);
@@ -31,6 +31,5 @@ namespace aga
         xcb_screen_t *m_XCBScreen;
         xcb_window_t m_XCBWindow;
         xcb_intern_atom_reply_t *m_XCBAtomWindowReply;
-        VkSurfaceKHR m_VulkanSurface;
     };
 }  // namespace aga
