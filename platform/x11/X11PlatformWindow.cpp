@@ -299,14 +299,17 @@ namespace aga
 
     bool X11PlatformWindow::CreateSwapChain()
     {
-        if (m_SwapChainImageCount > m_SurfaceCapabilities.maxImageCount)
-        {
-            m_SwapChainImageCount = m_SurfaceCapabilities.maxImageCount;
-        }
-
         if (m_SwapChainImageCount < m_SurfaceCapabilities.minImageCount + 1)
         {
             m_SwapChainImageCount = m_SurfaceCapabilities.minImageCount + 1;
+        }
+
+        if (m_SurfaceCapabilities.maxImageCount > 0)
+        {
+            if (m_SwapChainImageCount > m_SurfaceCapabilities.maxImageCount)
+            {
+                m_SwapChainImageCount = m_SurfaceCapabilities.maxImageCount;
+            }
         }
 
         VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
@@ -316,7 +319,7 @@ namespace aga
                                                           m_VulkanSurface, &presentModeCount,
                                                           VK_NULL_HANDLE) != VK_SUCCESS)
             {
-                LOG_DEBUG_F("X11PlatformWindow CreateSwapChain failed\n");
+                LOG_ERROR_F("X11PlatformWindow CreateSwapChain failed\n");
                 return false;
             }
 
@@ -325,7 +328,7 @@ namespace aga
                                                           m_VulkanSurface, &presentModeCount,
                                                           presentModes.data()) != VK_SUCCESS)
             {
-                LOG_DEBUG_F("X11PlatformWindow CreateSwapChain failed\n");
+                LOG_ERROR_F("X11PlatformWindow CreateSwapChain failed\n");
                 return false;
             }
 
@@ -362,14 +365,14 @@ namespace aga
         if (vkCreateSwapchainKHR(m_Renderer->GetVulkanDevice(), &swapChainCreateInfo,
                                  VK_NULL_HANDLE, &m_SwapChain) != VK_SUCCESS)
         {
-            LOG_DEBUG_F("X11PlatformWindow CreateSwapChain failed\n");
+            LOG_ERROR_F("X11PlatformWindow CreateSwapChain failed\n");
             return false;
         }
 
         if (vkGetSwapchainImagesKHR(m_Renderer->GetVulkanDevice(), m_SwapChain,
                                     &m_SwapChainImageCount, VK_NULL_HANDLE) != VK_SUCCESS)
         {
-            LOG_DEBUG_F("X11PlatformWindow CreateSwapChain failed\n");
+            LOG_ERROR_F("X11PlatformWindow CreateSwapChain failed\n");
             return false;
         }
 
@@ -383,6 +386,59 @@ namespace aga
         vkDestroySwapchainKHR(m_Renderer->GetVulkanDevice(), m_SwapChain, VK_NULL_HANDLE);
 
         LOG_DEBUG_F("X11PlatformWindow Vulkan SwapChain destroyed\n");
+    }
+
+    bool X11PlatformWindow::CreateSwapChainImages()
+    {
+        m_SwapChainImages.resize(m_SwapChainImageCount);
+        m_SwapChainImagesViews.resize(m_SwapChainImageCount);
+
+        if (vkGetSwapchainImagesKHR(m_Renderer->GetVulkanDevice(), m_SwapChain,
+                                    &m_SwapChainImageCount, m_SwapChainImages.data()) != VK_SUCCESS)
+        {
+            LOG_ERROR_F("X11PlatformWindow CreateSwapChainImages failed\n");
+            return false;
+        }
+
+        for (uint32_t i = 0; i < m_SwapChainImageCount; ++i)
+        {
+            VkImageViewCreateInfo imageViewCreateInfo = {};
+            imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            imageViewCreateInfo.image = m_SwapChainImages[i];
+            imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            imageViewCreateInfo.format = m_SurfaceFormat.format;
+            imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+            imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+            imageViewCreateInfo.subresourceRange.levelCount = 1;
+            imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+            imageViewCreateInfo.subresourceRange.layerCount = 1;
+
+            if (vkCreateImageView(m_Renderer->GetVulkanDevice(), &imageViewCreateInfo, nullptr,
+                                  &m_SwapChainImagesViews[i]) != VK_SUCCESS)
+            {
+                LOG_ERROR_F("X11PlatformWindow CreateSwapChainImages failed\n");
+                return false;
+            }
+        }
+
+        LOG_DEBUG_F("X11PlatformWindow Vulkan SwapChain Images created\n");
+
+        return true;
+    }
+
+    void X11PlatformWindow::DestroySwapChainImages()
+    {
+        for (uint32_t i = 0; i < m_SwapChainImagesViews.size(); ++i)
+        {
+            vkDestroyImageView(m_Renderer->GetVulkanDevice(), m_SwapChainImagesViews[i],
+                               VK_NULL_HANDLE);
+        }
+
+        LOG_DEBUG_F("X11PlatformWindow Vulkan SwapChain Images destroyed\n");
     }
 
 }  // namespace aga

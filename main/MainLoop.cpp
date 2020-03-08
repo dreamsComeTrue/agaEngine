@@ -43,7 +43,10 @@ namespace aga
 
             if (m_PlatformWindowBase->CreateVulkanSurface())
             {
-                return m_PlatformWindowBase->CreateSwapChain();
+                if (m_PlatformWindowBase->CreateSwapChain())
+                {
+                    return m_PlatformWindowBase->CreateSwapChainImages();
+                }
             }
         }
 
@@ -52,6 +55,7 @@ namespace aga
 
     void MainLoop::DestroyWindow()
     {
+        m_PlatformWindowBase->DestroySwapChainImages();
         m_PlatformWindowBase->DestroySwapChain();
         m_PlatformWindowBase->DestroyVulkanSurface();
         m_PlatformWindowBase->Destroy();

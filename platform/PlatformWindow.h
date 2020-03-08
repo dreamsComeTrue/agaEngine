@@ -32,6 +32,9 @@ namespace aga
         virtual bool CreateSwapChain() = 0;
         virtual void DestroySwapChain() = 0;
 
+        virtual bool CreateSwapChainImages() = 0;
+        virtual void DestroySwapChainImages() = 0;
+
     protected:
         VulkanRenderer *m_Renderer;
         String m_Name;
@@ -44,9 +47,12 @@ namespace aga
         VkSurfaceKHR m_VulkanSurface;
         VkSurfaceCapabilitiesKHR m_SurfaceCapabilities;
         VkSurfaceFormatKHR m_SurfaceFormat;
-        
+
         VkSwapchainKHR m_SwapChain;
         uint32_t m_SwapChainImageCount;
+
+        std::vector<VkImage> m_SwapChainImages;
+        std::vector<VkImageView> m_SwapChainImagesViews;
     };
 
     class PlatformWindow

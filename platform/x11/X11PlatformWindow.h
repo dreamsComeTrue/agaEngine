@@ -27,6 +27,9 @@ namespace aga
         bool CreateSwapChain() override;
         void DestroySwapChain() override;
 
+        bool CreateSwapChainImages() override;
+        void DestroySwapChainImages() override;
+
         void _HandleEvent(const xcb_generic_event_t *event);
 
     private:
