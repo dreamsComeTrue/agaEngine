@@ -203,6 +203,8 @@ namespace aga
 
         VkPhysicalDeviceProperties physicalDeviceProperties = {};
         vkGetPhysicalDeviceProperties(m_VulkanPhysicalDevice, &physicalDeviceProperties);
+        vkGetPhysicalDeviceMemoryProperties(m_VulkanPhysicalDevice,
+                                            &m_PhysicalDeviceMemoryProperties);
 
         LOG_DEBUG(String("Physical Device name: ") + physicalDeviceProperties.deviceName + "\n");
 
@@ -424,5 +426,10 @@ namespace aga
     const VkPhysicalDevice VulkanRenderer::GetPhysicalDevice()
     {
         return m_VulkanPhysicalDevice;
+    }
+
+    const VkPhysicalDeviceMemoryProperties& VulkanRenderer::GetVulkanPhysicalDeviceMemoryProperties() const
+    {
+        return m_PhysicalDeviceMemoryProperties;
     }
 }  // namespace aga

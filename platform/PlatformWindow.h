@@ -26,14 +26,24 @@ namespace aga
 
         void SetRenderer(VulkanRenderer *renderer);
 
-        virtual bool CreateVulkanSurface() = 0;
-        virtual void DestroyVulkanSurface() = 0;
+        bool CreateVulkanSurface();
+        void DestroyVulkanSurface();
 
-        virtual bool CreateSwapChain() = 0;
-        virtual void DestroySwapChain() = 0;
+        bool CreateSwapChain();
+        void DestroySwapChain();
 
-        virtual bool CreateSwapChainImages() = 0;
-        virtual void DestroySwapChainImages() = 0;
+        bool CreateSwapChainImages();
+        void DestroySwapChainImages();
+
+        bool CreateDepthStencilImage();
+        void DestroyDepthStencilImage();
+
+        uint32_t FindMemoryTypeIndex(const VkPhysicalDeviceMemoryProperties *memoryProperties,
+                                     const VkMemoryRequirements *memoryRequirements,
+                                     const VkMemoryPropertyFlags requiredPropertyFlags);
+
+    protected:
+        virtual VkSurfaceKHR _CreateVulkanSurface() = 0;
 
     protected:
         VulkanRenderer *m_Renderer;
@@ -46,6 +56,8 @@ namespace aga
 
         VkSurfaceKHR m_VulkanSurface;
         VkSurfaceCapabilitiesKHR m_SurfaceCapabilities;
+        VkFormat m_DepthStencilFormat;
+        bool m_IsStencilAvailable;
         VkSurfaceFormatKHR m_SurfaceFormat;
 
         VkSwapchainKHR m_SwapChain;
@@ -53,6 +65,10 @@ namespace aga
 
         std::vector<VkImage> m_SwapChainImages;
         std::vector<VkImageView> m_SwapChainImagesViews;
+
+        VkImage m_DepthStencilImage;
+        VkDeviceMemory m_DepthStencilImageMemory;
+        VkImageView m_DepthStencilImageView;
     };
 
     class PlatformWindow

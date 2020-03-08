@@ -21,16 +21,10 @@ namespace aga
 
         bool Update() override;
 
-        bool CreateVulkanSurface() override;
-        void DestroyVulkanSurface() override;
-
-        bool CreateSwapChain() override;
-        void DestroySwapChain() override;
-
-        bool CreateSwapChainImages() override;
-        void DestroySwapChainImages() override;
-
         void _HandleEvent(const xcb_generic_event_t *event);
+
+    protected:
+        virtual VkSurfaceKHR _CreateVulkanSurface() override;
 
     private:
         xcb_connection_t *m_XCBConnection;

@@ -16,16 +16,17 @@ namespace aga
 
         bool Initialize();
         void Destroy();
-        
+
         void SetPlatformWindow(PlatformWindowBase *window);
 
         bool RenderFrame();
 
         void CreateCommandPool();
-        
+
         const VkInstance GetVulkanInstance();
         const VkDevice GetVulkanDevice();
         const VkPhysicalDevice GetPhysicalDevice();
+        const VkPhysicalDeviceMemoryProperties& GetVulkanPhysicalDeviceMemoryProperties() const;
 
     private:
         bool _InitInstance();
@@ -44,6 +45,7 @@ namespace aga
         VkPhysicalDevice m_VulkanPhysicalDevice;
         uint32_t m_GraphicsFamilyIndex;
         VkQueue m_Queue;
+        VkPhysicalDeviceMemoryProperties m_PhysicalDeviceMemoryProperties;
 
         std::vector<const char *> m_InstanceLayers;
         std::vector<const char *> m_InstanceExtensions;

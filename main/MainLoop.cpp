@@ -45,7 +45,10 @@ namespace aga
             {
                 if (m_PlatformWindowBase->CreateSwapChain())
                 {
-                    return m_PlatformWindowBase->CreateSwapChainImages();
+                    if (m_PlatformWindowBase->CreateSwapChainImages())
+                    {
+                        return m_PlatformWindowBase->CreateDepthStencilImage();
+                    }
                 }
             }
         }
@@ -55,6 +58,7 @@ namespace aga
 
     void MainLoop::DestroyWindow()
     {
+        m_PlatformWindowBase->DestroyDepthStencilImage();
         m_PlatformWindowBase->DestroySwapChainImages();
         m_PlatformWindowBase->DestroySwapChain();
         m_PlatformWindowBase->DestroyVulkanSurface();
