@@ -28,6 +28,13 @@ namespace aga
 
     void MainLoop::DestroyRenderer()
     {
+        m_Renderer->DestroySynchronizations();
+        m_Renderer->DestroyFrameBuffers();
+        m_Renderer->DestroyRenderPass();
+        m_Renderer->DestroyDepthStencilImage();
+        m_Renderer->DestroySwapChainImages();
+        m_Renderer->DestroySwapChain();
+        m_Renderer->DestroyVulkanSurface();
         m_Renderer->Destroy();
         SAFE_DELETE(m_Renderer);
     }
@@ -35,21 +42,28 @@ namespace aga
     bool MainLoop::InitializeWindow(const char *title, size_t width, size_t height)
     {
         m_PlatformWindowBase = PlatformWindow::getInstance();
+        m_PlatformWindowBase->SetRenderer(m_Renderer);
+        m_Renderer->SetSurfaceSize(width, height);
 
         if (m_PlatformWindowBase->Initialize(title, width, height))
         {
-            m_PlatformWindowBase->SetRenderer(m_Renderer);
             m_Renderer->SetPlatformWindow(m_PlatformWindowBase);
 
-            if (m_PlatformWindowBase->CreateVulkanSurface())
+            if (m_Renderer->CreateVulkanSurface())
             {
-                if (m_PlatformWindowBase->CreateSwapChain())
+                if (m_Renderer->CreateSwapChain())
                 {
-                    if (m_PlatformWindowBase->CreateSwapChainImages())
+                    if (m_Renderer->CreateSwapChainImages())
                     {
-                        if (m_PlatformWindowBase->CreateDepthStencilImage())
+                        if (m_Renderer->CreateDepthStencilImage())
                         {
-                            return m_PlatformWindowBase->CreateRenderPass();
+                            if (m_Renderer->CreateRenderPass())
+                            {
+                                if (m_Renderer->CreateFrameBuffers())
+                                {
+                                    return m_Renderer->CreateSynchronizations();
+                                }
+                            }
                         }
                     }
                 }
@@ -61,11 +75,7 @@ namespace aga
 
     void MainLoop::DestroyWindow()
     {
-        m_PlatformWindowBase->DestroyDepthStencilImage();
-        m_PlatformWindowBase->DestroySwapChainImages();
-        m_PlatformWindowBase->DestroySwapChain();
-        m_PlatformWindowBase->DestroyVulkanSurface();
-        m_PlatformWindowBase->Destroy();
+        vkQueueWaitIdle(m_Renderer->GetVulkanQueue());
         SAFE_DELETE(m_PlatformWindowBase);
     }
 
@@ -74,6 +84,10 @@ namespace aga
         //  TODO: Low CPU usage mode
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-        return m_Renderer->RenderFrame();
+        m_Renderer->BeginRender();
+        m_Renderer->RenderFrame();
+        m_Renderer->EndRender();
+
+        return m_PlatformWindowBase->Update();
     }
 }  // namespace aga

@@ -24,12 +24,13 @@ namespace aga
         void _HandleEvent(const xcb_generic_event_t *event);
 
     protected:
-        virtual VkSurfaceKHR _CreateVulkanSurface() override;
+        virtual VkSurfaceKHR CreateVulkanSurface() override;
 
     private:
         xcb_connection_t *m_XCBConnection;
         xcb_screen_t *m_XCBScreen;
         xcb_window_t m_XCBWindow;
         xcb_intern_atom_reply_t *m_XCBAtomWindowReply;
+        VkSurfaceKHR m_Surface;
     };
 }  // namespace aga

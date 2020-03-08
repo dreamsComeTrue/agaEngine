@@ -11,7 +11,8 @@ namespace aga
         m_XCBConnection(nullptr),
         m_XCBScreen(nullptr),
         m_XCBWindow(0),
-        m_XCBAtomWindowReply(nullptr)
+        m_XCBAtomWindowReply(nullptr),
+        m_Surface(nullptr)
     {
     }
 
@@ -24,8 +25,6 @@ namespace aga
         m_Name = title;
         m_Width = width;
         m_Height = height;
-        m_SurfaceWidth = m_Width;
-        m_SurfaceHeight = m_Height;
 
         if (m_Width <= 0 || m_Height <= 0)
         {
@@ -237,7 +236,7 @@ namespace aga
         }
     }
 
-    VkSurfaceKHR X11PlatformWindow::_CreateVulkanSurface()
+    VkSurfaceKHR X11PlatformWindow::CreateVulkanSurface()
     {
         VkXcbSurfaceCreateInfoKHR surfaceCreateInfo = {};
         surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
@@ -245,9 +244,9 @@ namespace aga
         surfaceCreateInfo.window = m_XCBWindow;
 
         vkCreateXcbSurfaceKHR(m_Renderer->GetVulkanInstance(), &surfaceCreateInfo, VK_NULL_HANDLE,
-                              &m_VulkanSurface);
+                              &m_Surface);
 
-        return m_VulkanSurface;
+        return m_Surface;
     }
 
 }  // namespace aga
