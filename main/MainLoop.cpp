@@ -35,21 +35,24 @@ namespace aga
     bool MainLoop::InitializeWindow(const char *title, size_t width, size_t height)
     {
         m_PlatformWindowBase = PlatformWindow::getInstance();
-        bool result = m_PlatformWindowBase->Initialize(title, width, height);
 
-        if (result)
+        if (m_PlatformWindowBase->Initialize(title, width, height))
         {
             m_PlatformWindowBase->SetRenderer(m_Renderer);
             m_Renderer->SetPlatformWindow(m_PlatformWindowBase);
 
-            return m_PlatformWindowBase->CreateVulkanSurface();
+            if (m_PlatformWindowBase->CreateVulkanSurface())
+            {
+                return m_PlatformWindowBase->CreateSwapChain();
+            }
         }
 
-        return result;
+        return false;
     }
 
     void MainLoop::DestroyWindow()
     {
+        m_PlatformWindowBase->DestroySwapChain();
         m_PlatformWindowBase->DestroyVulkanSurface();
         m_PlatformWindowBase->Destroy();
         SAFE_DELETE(m_PlatformWindowBase);

@@ -24,6 +24,7 @@ namespace aga
         void CreateCommandPool();
         
         const VkInstance GetVulkanInstance();
+        const VkDevice GetVulkanDevice();
         const VkPhysicalDevice GetPhysicalDevice();
 
     private:

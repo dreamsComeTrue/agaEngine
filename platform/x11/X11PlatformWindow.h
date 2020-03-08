@@ -24,6 +24,9 @@ namespace aga
         bool CreateVulkanSurface() override;
         void DestroyVulkanSurface() override;
 
+        bool CreateSwapChain() override;
+        void DestroySwapChain() override;
+
         void _HandleEvent(const xcb_generic_event_t *event);
 
     private:

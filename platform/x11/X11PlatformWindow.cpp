@@ -24,6 +24,8 @@ namespace aga
         m_Name = title;
         m_Width = width;
         m_Height = height;
+        m_SurfaceWidth = m_Width;
+        m_SurfaceHeight = m_Height;
 
         if (m_Width <= 0 || m_Height <= 0)
         {
@@ -242,15 +244,24 @@ namespace aga
         surfaceCreateInfo.connection = m_XCBConnection;
         surfaceCreateInfo.window = m_XCBWindow;
 
-        vkCreateXcbSurfaceKHR(m_Renderer->GetVulkanInstance(), &surfaceCreateInfo, nullptr,
+        vkCreateXcbSurfaceKHR(m_Renderer->GetVulkanInstance(), &surfaceCreateInfo, VK_NULL_HANDLE,
                               &m_VulkanSurface);
 
         VkPhysicalDevice device = m_Renderer->GetPhysicalDevice();
 
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, m_VulkanSurface, &m_SurfaceCapabilities);
+
+        if (m_SurfaceCapabilities.currentExtent.width < UINT32_MAX ||
+            m_SurfaceCapabilities.currentExtent.height < UINT32_MAX)
+        {
+            m_SurfaceWidth = m_SurfaceCapabilities.currentExtent.width;
+            m_SurfaceHeight = m_SurfaceCapabilities.currentExtent.height;
+        }
+
         {
             uint32_t formatCount = 0;
-            vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_VulkanSurface, &formatCount, nullptr);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_VulkanSurface, &formatCount,
+                                                 VK_NULL_HANDLE);
             std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
             vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_VulkanSurface, &formatCount,
                                                  surfaceFormats.data());
@@ -280,10 +291,98 @@ namespace aga
 
     void X11PlatformWindow::DestroyVulkanSurface()
     {
-        vkDestroySurfaceKHR(m_Renderer->GetVulkanInstance(), m_VulkanSurface, nullptr);
+        vkDestroySurfaceKHR(m_Renderer->GetVulkanInstance(), m_VulkanSurface, VK_NULL_HANDLE);
         m_VulkanSurface = VK_NULL_HANDLE;
 
         LOG_DEBUG_F("X11PlatformWindow Vulkan Surface destroyed\n");
+    }
+
+    bool X11PlatformWindow::CreateSwapChain()
+    {
+        if (m_SwapChainImageCount > m_SurfaceCapabilities.maxImageCount)
+        {
+            m_SwapChainImageCount = m_SurfaceCapabilities.maxImageCount;
+        }
+
+        if (m_SwapChainImageCount < m_SurfaceCapabilities.minImageCount + 1)
+        {
+            m_SwapChainImageCount = m_SurfaceCapabilities.minImageCount + 1;
+        }
+
+        VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        {
+            uint32_t presentModeCount = 0;
+            if (vkGetPhysicalDeviceSurfacePresentModesKHR(m_Renderer->GetPhysicalDevice(),
+                                                          m_VulkanSurface, &presentModeCount,
+                                                          VK_NULL_HANDLE) != VK_SUCCESS)
+            {
+                LOG_DEBUG_F("X11PlatformWindow CreateSwapChain failed\n");
+                return false;
+            }
+
+            std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+            if (vkGetPhysicalDeviceSurfacePresentModesKHR(m_Renderer->GetPhysicalDevice(),
+                                                          m_VulkanSurface, &presentModeCount,
+                                                          presentModes.data()) != VK_SUCCESS)
+            {
+                LOG_DEBUG_F("X11PlatformWindow CreateSwapChain failed\n");
+                return false;
+            }
+
+            //  Look for V-Sync support
+            for (VkPresentModeKHR mode : presentModes)
+            {
+                if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
+                {
+                    presentMode = mode;
+                    break;
+                }
+            }
+        }
+
+        VkSwapchainCreateInfoKHR swapChainCreateInfo = {};
+        swapChainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        swapChainCreateInfo.surface = m_VulkanSurface;
+        swapChainCreateInfo.minImageCount = m_SwapChainImageCount;
+        swapChainCreateInfo.imageFormat = m_SurfaceFormat.format;
+        swapChainCreateInfo.imageColorSpace = m_SurfaceFormat.colorSpace;
+        swapChainCreateInfo.imageExtent.width = m_SurfaceWidth;
+        swapChainCreateInfo.imageExtent.height = m_SurfaceHeight;
+        swapChainCreateInfo.imageArrayLayers = 1;
+        swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        swapChainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        swapChainCreateInfo.queueFamilyIndexCount = 0;
+        swapChainCreateInfo.pQueueFamilyIndices = VK_NULL_HANDLE;
+        swapChainCreateInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+        swapChainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        swapChainCreateInfo.presentMode = presentMode;
+        swapChainCreateInfo.clipped = VK_TRUE;
+        swapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
+
+        if (vkCreateSwapchainKHR(m_Renderer->GetVulkanDevice(), &swapChainCreateInfo,
+                                 VK_NULL_HANDLE, &m_SwapChain) != VK_SUCCESS)
+        {
+            LOG_DEBUG_F("X11PlatformWindow CreateSwapChain failed\n");
+            return false;
+        }
+
+        if (vkGetSwapchainImagesKHR(m_Renderer->GetVulkanDevice(), m_SwapChain,
+                                    &m_SwapChainImageCount, VK_NULL_HANDLE) != VK_SUCCESS)
+        {
+            LOG_DEBUG_F("X11PlatformWindow CreateSwapChain failed\n");
+            return false;
+        }
+
+        LOG_DEBUG_F("X11PlatformWindow Vulkan SwapChain created\n");
+
+        return true;
+    }
+
+    void X11PlatformWindow::DestroySwapChain()
+    {
+        vkDestroySwapchainKHR(m_Renderer->GetVulkanDevice(), m_SwapChain, VK_NULL_HANDLE);
+
+        LOG_DEBUG_F("X11PlatformWindow Vulkan SwapChain destroyed\n");
     }
 
 }  // namespace aga

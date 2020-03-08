@@ -16,7 +16,9 @@ namespace aga
     PlatformWindowBase::PlatformWindowBase() :
         m_Renderer(nullptr),
         m_ShouldRun(true),
-        m_VulkanSurface(VK_NULL_HANDLE)
+        m_VulkanSurface(VK_NULL_HANDLE),
+        m_SwapChain(VK_NULL_HANDLE),
+        m_SwapChainImageCount(2)
     {
     }
 

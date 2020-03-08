@@ -29,16 +29,24 @@ namespace aga
         virtual bool CreateVulkanSurface() = 0;
         virtual void DestroyVulkanSurface() = 0;
 
+        virtual bool CreateSwapChain() = 0;
+        virtual void DestroySwapChain() = 0;
+
     protected:
         VulkanRenderer *m_Renderer;
         String m_Name;
         uint32_t m_Width;
         uint32_t m_Height;
+        uint32_t m_SurfaceWidth;
+        uint32_t m_SurfaceHeight;
         bool m_ShouldRun;
 
         VkSurfaceKHR m_VulkanSurface;
         VkSurfaceCapabilitiesKHR m_SurfaceCapabilities;
         VkSurfaceFormatKHR m_SurfaceFormat;
+        
+        VkSwapchainKHR m_SwapChain;
+        uint32_t m_SwapChainImageCount;
     };
 
     class PlatformWindow

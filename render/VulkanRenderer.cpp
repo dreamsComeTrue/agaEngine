@@ -183,6 +183,8 @@ namespace aga
 
     bool VulkanRenderer::_InitDevice()
     {
+        m_DeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
         uint32_t physicalDevicesCount = 0;
         vkEnumeratePhysicalDevices(m_VulkanInstance, &physicalDevicesCount, VK_NULL_HANDLE);
         std::vector<VkPhysicalDevice> devices(physicalDevicesCount);
@@ -412,6 +414,11 @@ namespace aga
     const VkInstance VulkanRenderer::GetVulkanInstance()
     {
         return m_VulkanInstance;
+    }
+
+    const VkDevice VulkanRenderer::GetVulkanDevice()
+    {
+        return m_VulkanDevice;
     }
 
     const VkPhysicalDevice VulkanRenderer::GetPhysicalDevice()
