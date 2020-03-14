@@ -3,6 +3,7 @@
 #pragma once
 
 #include "platform/Platform.h"
+#include "core/String.h"
 
 namespace aga
 {
@@ -62,10 +63,14 @@ namespace aga
         VkExtent2D GetSurfaceSize();
 
     private:
+        void CheckResult(VkResult result, const String& message);
+        
+        void _PrepareExtensions();
         bool _InitInstance();
         void _DestroyInstance();
 
         bool _InitDevice();
+        bool _IsPhysicalDeviceSuitable(VkPhysicalDevice device);
         void _DestroyDevice();
 
         bool _InitDebugging();

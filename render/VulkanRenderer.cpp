@@ -10,7 +10,7 @@
 
 namespace aga
 {
-    const std::vector<const char *> g_ValidationLayers = {"VK_LAYER_LUNARG_standard_validation"};
+    const std::vector<const char *> g_ValidationLayers = {"VK_LAYER_KHRONOS_validation"};
 
     VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDebugCallback(VkDebugReportFlagsEXT flags,
                                                        VkDebugReportObjectTypeEXT objectType,
@@ -289,7 +289,7 @@ namespace aga
                 return false;
             }
 
-            //  Look for V-Sync support
+            // Look for V-Sync support
             for (VkPresentModeKHR mode : presentModes)
             {
                 if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
@@ -636,12 +636,9 @@ namespace aga
 
     bool VulkanRenderer::Initialize()
     {
-        if (!_InitInstance())
-        {
-            return false;
-        }
+        _PrepareExtensions();
 
-        if (!_InitDevice())
+        if (!_InitInstance())
         {
             return false;
         }
@@ -649,6 +646,11 @@ namespace aga
 #if BUILD_ENABLE_VULKAN_DEBUG
         _InitDebugging();
 #endif
+
+        if (!_InitDevice())
+        {
+            return false;
+        }
 
         m_CommandPool = CreateCommandPool();
         m_CommandBuffer = CreateCommandBuffer(m_CommandPool);
@@ -665,6 +667,7 @@ namespace aga
 #if BUILD_ENABLE_VULKAN_DEBUG
         _DestroyDebugging();
 #endif
+
         _DestroyInstance();
     }
 
@@ -679,7 +682,7 @@ namespace aga
         m_SurfaceHeight = height;
     }
 
-    bool VulkanRenderer::_InitInstance()
+    void VulkanRenderer::_PrepareExtensions()
     {
 #if BUILD_ENABLE_VULKAN_DEBUG
         m_DebugCallbackCreateInfo = {};
@@ -691,10 +694,16 @@ namespace aga
             VK_DEBUG_REPORT_DEBUG_BIT_EXT;
 #endif
 
-        for (const char *layer : g_ValidationLayers)
+        uint32_t extensionCount = 0;
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+        std::vector<VkExtensionProperties> extensions(extensionCount);
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+
+        LOG_INFO("Available extensions:\n");
+
+        for (const VkExtensionProperties &extension : extensions)
         {
-            m_InstanceLayers.push_back(layer);
-            m_DeviceLayers.push_back(layer);
+            LOG_INFO(String("\t") + extension.extensionName + "\n");
         }
 
         m_InstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
@@ -708,6 +717,16 @@ namespace aga
             m_InstanceExtensions.push_back(ext);
         }
 
+        // Prepare validation layers as well
+        for (const char *layer : g_ValidationLayers)
+        {
+            m_InstanceLayers.push_back(layer);
+            m_DeviceLayers.push_back(layer);
+        }
+    }
+
+    bool VulkanRenderer::_InitInstance()
+    {
         VkApplicationInfo applicationInfo = {};
         applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
         applicationInfo.apiVersion = VK_API_VERSION_1_2;
@@ -729,14 +748,8 @@ namespace aga
         instanceCreateInfo.pNext = &m_DebugCallbackCreateInfo;
 #endif
 
-        VkResult result = vkCreateInstance(&instanceCreateInfo, VK_NULL_HANDLE, &m_VulkanInstance);
-
-        if (result != VK_SUCCESS)
-        {
-            LOG_ERROR_F("vkCreateInstance failed!\n");
-
-            return false;
-        }
+        CheckResult(vkCreateInstance(&instanceCreateInfo, VK_NULL_HANDLE, &m_VulkanInstance),
+                    "vkCreateInstance failed!\n");
 
         LOG_DEBUG_F("vkCreateInstance succeeded\n");
 
@@ -767,12 +780,24 @@ namespace aga
 
         if (physicalDevicesCount < 1)
         {
-            LOG_ERROR("Can't find any Physical Device!\n");
+            LOG_ERROR_F("Can't find any Physical Device!\n");
             return false;
         }
 
-        //  TODO: find correct GPU!
-        m_VulkanPhysicalDevice = devices[0];
+        for (const VkPhysicalDevice &device : devices)
+        {
+            if (_IsPhysicalDeviceSuitable(device))
+            {
+                m_VulkanPhysicalDevice = device;
+                break;
+            }
+        }
+
+        if (m_VulkanPhysicalDevice == VK_NULL_HANDLE)
+        {
+            LOG_ERROR_F("failed to find a suitable GPU!");
+            return false;
+        }
 
         VkPhysicalDeviceProperties physicalDeviceProperties = {};
         vkGetPhysicalDeviceProperties(m_VulkanPhysicalDevice, &physicalDeviceProperties);
@@ -884,6 +909,14 @@ namespace aga
         return true;
     }
 
+    bool VulkanRenderer::_IsPhysicalDeviceSuitable(VkPhysicalDevice device)
+    {
+        VkPhysicalDeviceProperties deviceProperties;
+        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+        return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+    }
+
     void VulkanRenderer::_DestroyDevice()
     {
         if (m_RenderCompleteSemaphore)
@@ -919,8 +952,9 @@ namespace aga
             return false;
         }
 
-        createDebugReportCallbackEXTFunc(m_VulkanInstance, &m_DebugCallbackCreateInfo,
-                                         VK_NULL_HANDLE, &m_DebugReport);
+        CheckResult(createDebugReportCallbackEXTFunc(m_VulkanInstance, &m_DebugCallbackCreateInfo,
+                                                     VK_NULL_HANDLE, &m_DebugReport),
+                    "Can't create Vulkan debug report callback");
 
         LOG_DEBUG_F("Vulkan debugging enabled\n");
 #endif
@@ -1003,6 +1037,16 @@ namespace aga
     const VkSemaphore VulkanRenderer::GetRenderCompleteSemaphore() const
     {
         return m_RenderCompleteSemaphore;
+    }
+
+    void VulkanRenderer::CheckResult(VkResult result, const String &message)
+    {
+        if (result != VK_SUCCESS)
+        {
+            LOG_ERROR_F(message);
+
+            std::exit(-1);
+        }
     }
 
     uint32_t
