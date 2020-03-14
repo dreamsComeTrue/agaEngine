@@ -16,7 +16,7 @@ namespace aga
         X11PlatformWindow();
         ~X11PlatformWindow();
 
-        bool Initialize(const char *title, uint32_t width = 1024, uint32_t height = 768) override;
+        bool Initialize(const char *title, uint32_t width = 1280, uint32_t height = 800) override;
         void Destroy() override;
 
         bool Update() override;
