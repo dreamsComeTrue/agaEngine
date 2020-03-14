@@ -17,10 +17,15 @@ int main(int argc, char *argv[])
             exit(-1);
         }
 
-        if (!mainLoop.InitializeWindow(title))
+        if (!mainLoop.InitializeWindow())
         {
             exit(-1);
         }
+        
+        if (!mainLoop.Initialize(title))
+        {
+            exit(-1);
+        }        
 
         while (mainLoop.Iterate())
             ;

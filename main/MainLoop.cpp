@@ -21,7 +21,6 @@ namespace aga
     bool MainLoop::InitializeRenderer()
     {
         m_Renderer = new VulkanRenderer();
-        m_Renderer->Initialize();
 
         return true;
     }
@@ -39,15 +38,21 @@ namespace aga
         SAFE_DELETE(m_Renderer);
     }
 
-    bool MainLoop::InitializeWindow(const char *title, size_t width, size_t height)
+    bool MainLoop::InitializeWindow()
     {
         m_PlatformWindowBase = PlatformWindow::getInstance();
         m_PlatformWindowBase->SetRenderer(m_Renderer);
-        m_Renderer->SetSurfaceSize(width, height);
 
+        return true;
+    }
+
+    bool MainLoop::Initialize(const char *title, size_t width, size_t height)
+    {
         if (m_PlatformWindowBase->Initialize(title, width, height))
         {
             m_Renderer->SetPlatformWindow(m_PlatformWindowBase);
+            m_Renderer->SetSurfaceSize(width, height);
+            m_Renderer->Initialize();
 
             if (m_Renderer->CreateVulkanSurface())
             {

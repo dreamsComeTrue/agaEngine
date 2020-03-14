@@ -18,8 +18,10 @@ namespace aga
         bool InitializeRenderer();
         void DestroyRenderer();
 
-        bool InitializeWindow(const char* title, size_t width = 1280, size_t height = 800);
+        bool InitializeWindow();
         void DestroyWindow();
+        
+        bool Initialize(const char* title, size_t width = 1280, size_t height = 800);
 
         bool Iterate() const;
 

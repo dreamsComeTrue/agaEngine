@@ -243,8 +243,10 @@ namespace aga
         surfaceCreateInfo.connection = m_XCBConnection;
         surfaceCreateInfo.window = m_XCBWindow;
 
-        vkCreateXcbSurfaceKHR(m_Renderer->GetVulkanInstance(), &surfaceCreateInfo, VK_NULL_HANDLE,
-                              &m_Surface);
+        VulkanRenderer::CheckResult(vkCreateXcbSurfaceKHR(m_Renderer->GetVulkanInstance(),
+                                                          &surfaceCreateInfo, VK_NULL_HANDLE,
+                                                          &m_Surface),
+                                    "Can't create X11 Vulkan surface!\n");
 
         return m_Surface;
     }

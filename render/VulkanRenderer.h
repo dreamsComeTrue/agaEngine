@@ -2,12 +2,28 @@
 
 #pragma once
 
-#include "platform/Platform.h"
 #include "core/String.h"
+#include "platform/Platform.h"
 
 namespace aga
 {
     class PlatformWindowBase;
+
+    struct QueueFamilyIndices
+    {
+        static const int GRAPHICS_BIT = 1 << 0;
+        static const int PRESENT_BIT = 1 << 1;
+
+        uint32_t GraphicsIndex;
+        uint32_t PresentIndex;
+
+        int valid_bit = 0;
+
+        bool IsValid()
+        {
+            return (valid_bit & GRAPHICS_BIT) && (valid_bit & PRESENT_BIT);
+        }
+    };
 
     class VulkanRenderer
     {
@@ -62,16 +78,18 @@ namespace aga
         VkFramebuffer GetActiveFrameBuffer();
         VkExtent2D GetSurfaceSize();
 
+        static void CheckResult(VkResult result, const String &message);
+
     private:
-        void CheckResult(VkResult result, const String& message);
-        
         void _PrepareExtensions();
         bool _InitInstance();
         void _DestroyInstance();
 
-        bool _InitDevice();
+        bool _InitPhysicalDevice();
+        QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
         bool _IsPhysicalDeviceSuitable(VkPhysicalDevice device);
-        void _DestroyDevice();
+        bool _InitLogicalDevice();
+        void _DestroyLogicalDevice();
 
         bool _InitDebugging();
         bool _DestroyDebugging();
@@ -86,7 +104,8 @@ namespace aga
         VkDevice m_VulkanDevice;
         VkPhysicalDevice m_VulkanPhysicalDevice;
         uint32_t m_GraphicsFamilyIndex;
-        VkQueue m_Queue;
+        uint32_t m_PresentFamilyIndex;
+        VkQueue m_GraphicsQueue;
         VkPhysicalDeviceMemoryProperties m_PhysicalDeviceMemoryProperties;
 
         VkCommandPool m_CommandPool;

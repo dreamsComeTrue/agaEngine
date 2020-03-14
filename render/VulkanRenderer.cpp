@@ -52,8 +52,9 @@ namespace aga
         m_VulkanInstance(VK_NULL_HANDLE),
         m_VulkanDevice(VK_NULL_HANDLE),
         m_VulkanPhysicalDevice(VK_NULL_HANDLE),
-        m_GraphicsFamilyIndex(0),
-        m_Queue(VK_NULL_HANDLE),
+        m_GraphicsFamilyIndex(-1),
+        m_PresentFamilyIndex(-1),
+        m_GraphicsQueue(VK_NULL_HANDLE),
         m_DebugReport(VK_NULL_HANDLE),
         m_RenderCompleteSemaphore(VK_NULL_HANDLE),
         m_CommandPool(VK_NULL_HANDLE),
@@ -95,7 +96,7 @@ namespace aga
             return false;
         }
 
-        if (vkQueueWaitIdle(m_Queue) != VK_SUCCESS)
+        if (vkQueueWaitIdle(m_GraphicsQueue) != VK_SUCCESS)
         {
             LOG_ERROR_F("PlatformWindowBase Queue Wait Idle error\n");
 
@@ -119,7 +120,7 @@ namespace aga
         presentInfo.pImageIndices = &m_ActiveSwapChainImageID;
         presentInfo.pResults = &presentResult;
 
-        if (vkQueuePresentKHR(m_Queue, &presentInfo) != VK_SUCCESS)
+        if (vkQueuePresentKHR(m_GraphicsQueue, &presentInfo) != VK_SUCCESS)
         {
             LOG_ERROR_F("PlatformWindowBase Queue present error\n");
 
@@ -196,15 +197,13 @@ namespace aga
         submitInfo.pWaitSemaphores = VK_NULL_HANDLE;
         submitInfo.pWaitDstStageMask = VK_NULL_HANDLE;
 
-        vkQueueSubmit(m_Queue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
 
         return true;
     }
 
     bool VulkanRenderer::CreateVulkanSurface()
     {
-        m_VulkanSurface = m_PlatformWindow->CreateVulkanSurface();
-
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_VulkanPhysicalDevice, m_VulkanSurface,
                                                   &m_SurfaceCapabilities);
 
@@ -647,7 +646,12 @@ namespace aga
         _InitDebugging();
 #endif
 
-        if (!_InitDevice())
+        if (!_InitPhysicalDevice())
+        {
+            return false;
+        }
+
+        if (!_InitLogicalDevice())
         {
             return false;
         }
@@ -662,7 +666,7 @@ namespace aga
     {
         DestroyCommandPool(m_CommandPool);
 
-        _DestroyDevice();
+        _DestroyLogicalDevice();
 
 #if BUILD_ENABLE_VULKAN_DEBUG
         _DestroyDebugging();
@@ -753,6 +757,8 @@ namespace aga
 
         LOG_DEBUG_F("vkCreateInstance succeeded\n");
 
+        m_VulkanSurface = m_PlatformWindow->CreateVulkanSurface();
+
         return true;
     }
 
@@ -767,7 +773,7 @@ namespace aga
         }
     }
 
-    bool VulkanRenderer::_InitDevice()
+    bool VulkanRenderer::_InitPhysicalDevice()
     {
         m_DeviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
@@ -821,35 +827,12 @@ namespace aga
 
         LOG_DEBUG(String("Physical Device type: ") + deviceType + "\n");
 
-        uint32_t queueFamilyProperyCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(m_VulkanPhysicalDevice, &queueFamilyProperyCount,
-                                                 VK_NULL_HANDLE);
-        std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyProperyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(m_VulkanPhysicalDevice, &queueFamilyProperyCount,
-                                                 queueFamilyProperties.data());
-
-        bool foundGraphicsBit = false;
-        for (uint32_t i = 0; i < queueFamilyProperyCount; ++i)
-        {
-            if (queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
-            {
-                foundGraphicsBit = true;
-                m_GraphicsFamilyIndex = i;
-                break;
-            }
-        }
-
-        if (!foundGraphicsBit)
-        {
-            LOG_ERROR_F("Can not find queue family supporting graphics!\n");
-
-            return false;
-        }
-
         uint32_t instanceLayersCount = 0;
-        vkEnumerateInstanceLayerProperties(&instanceLayersCount, VK_NULL_HANDLE);
+        CheckResult(vkEnumerateInstanceLayerProperties(&instanceLayersCount, VK_NULL_HANDLE), "");
         std::vector<VkLayerProperties> instanceLayerProperties(instanceLayersCount);
-        vkEnumerateInstanceLayerProperties(&instanceLayersCount, instanceLayerProperties.data());
+        CheckResult(vkEnumerateInstanceLayerProperties(&instanceLayersCount,
+                                                       instanceLayerProperties.data()),
+                    "");
 
         LOG_DEBUG("Instance layers:\n");
         for (const VkLayerProperties &layer : instanceLayerProperties)
@@ -858,11 +841,13 @@ namespace aga
         }
 
         uint32_t deviceLayersCount = 0;
-        vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount,
-                                         VK_NULL_HANDLE);
+        CheckResult(vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount,
+                                                     VK_NULL_HANDLE),
+                    "");
         std::vector<VkLayerProperties> deviceLayerProperties(deviceLayersCount);
-        vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount,
-                                         deviceLayerProperties.data());
+        CheckResult(vkEnumerateDeviceLayerProperties(m_VulkanPhysicalDevice, &deviceLayersCount,
+                                                     deviceLayerProperties.data()),
+                    "");
 
         LOG_DEBUG("Device layers:\n");
         for (const VkLayerProperties &layer : deviceLayerProperties)
@@ -870,12 +855,21 @@ namespace aga
             LOG_DEBUG(String("\t") + layer.layerName + " -> " + layer.description + "\n");
         }
 
+        LOG_DEBUG_F("Create Physical Device succeeded\n");
+
+        return true;
+    }
+
+    bool VulkanRenderer::_InitLogicalDevice()
+    {
         float queuePriorities[] = {1.0f};
         VkDeviceQueueCreateInfo queueCreateInfo = {};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueCount = 1;
         queueCreateInfo.queueFamilyIndex = m_GraphicsFamilyIndex;
         queueCreateInfo.pQueuePriorities = queuePriorities;
+
+        VkPhysicalDeviceFeatures deviceFeatures = {};
 
         VkDeviceCreateInfo deviceCreateInfo = {};
         deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -885,18 +879,13 @@ namespace aga
         deviceCreateInfo.ppEnabledLayerNames = m_DeviceLayers.data();
         deviceCreateInfo.enabledExtensionCount = m_DeviceExtensions.size();
         deviceCreateInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
+        deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
-        VkResult result = vkCreateDevice(m_VulkanPhysicalDevice, &deviceCreateInfo, VK_NULL_HANDLE,
-                                         &m_VulkanDevice);
+        CheckResult(vkCreateDevice(m_VulkanPhysicalDevice, &deviceCreateInfo, VK_NULL_HANDLE,
+                                   &m_VulkanDevice),
+                    "Create Logical Device failed!\n");
 
-        if (result != VK_SUCCESS)
-        {
-            LOG_ERROR_F("vkCreateDevice failed!\n");
-
-            return false;
-        }
-
-        vkGetDeviceQueue(m_VulkanDevice, m_GraphicsFamilyIndex, 0, &m_Queue);
+        vkGetDeviceQueue(m_VulkanDevice, m_GraphicsFamilyIndex, 0, &m_GraphicsQueue);
 
         VkSemaphoreCreateInfo semaphoreCreateInfo = {};
         semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -904,9 +893,45 @@ namespace aga
         vkCreateSemaphore(m_VulkanDevice, &semaphoreCreateInfo, VK_NULL_HANDLE,
                           &m_RenderCompleteSemaphore);
 
-        LOG_DEBUG_F("vkCreateDevice succeeded\n");
+        LOG_DEBUG_F("Create Logical Device succeeded\n");
 
         return true;
+    }
+
+    QueueFamilyIndices VulkanRenderer::FindQueueFamilies(VkPhysicalDevice device)
+    {
+        QueueFamilyIndices indices;
+
+        uint32_t queueFamilyProperyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyProperyCount, VK_NULL_HANDLE);
+        std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyProperyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyProperyCount,
+                                                 queueFamilyProperties.data());
+
+        for (uint32_t i = 0; i < queueFamilyProperyCount; ++i)
+        {
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_VulkanSurface, &presentSupport);
+
+            if (queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            {
+                indices.GraphicsIndex = i;
+                indices.valid_bit |= QueueFamilyIndices::GRAPHICS_BIT;
+            }
+
+            if (presentSupport)
+            {
+                indices.PresentIndex = i;
+                indices.valid_bit |= QueueFamilyIndices::PRESENT_BIT;
+            }
+
+            if (indices.IsValid())
+            {
+                break;
+            }
+        }
+
+        return indices;
     }
 
     bool VulkanRenderer::_IsPhysicalDeviceSuitable(VkPhysicalDevice device)
@@ -914,10 +939,24 @@ namespace aga
         VkPhysicalDeviceProperties deviceProperties;
         vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
-        return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+        QueueFamilyIndices indices = FindQueueFamilies(device);
+
+        if (indices.IsValid())
+        {
+            m_GraphicsFamilyIndex = indices.GraphicsIndex;
+            m_PresentFamilyIndex = indices.PresentIndex;
+        }
+        else
+        {
+            LOG_WARNING_F("Can not find queue family supporting graphics for device: " +
+                          deviceProperties.deviceName + "!\n");
+        }
+
+        return deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+               indices.IsValid();
     }
 
-    void VulkanRenderer::_DestroyDevice()
+    void VulkanRenderer::_DestroyLogicalDevice()
     {
         if (m_RenderCompleteSemaphore)
         {
@@ -929,7 +968,7 @@ namespace aga
             vkDestroyDevice(m_VulkanDevice, VK_NULL_HANDLE);
             m_VulkanDevice = VK_NULL_HANDLE;
 
-            LOG_DEBUG_F("m_VulkanDevice destroyed\n");
+            LOG_DEBUG_F("Vulkan Logical Device destroyed\n");
         }
     }
 
@@ -1031,7 +1070,7 @@ namespace aga
 
     const VkQueue &VulkanRenderer::GetVulkanQueue() const
     {
-        return m_Queue;
+        return m_GraphicsQueue;
     }
 
     const VkSemaphore VulkanRenderer::GetRenderCompleteSemaphore() const
