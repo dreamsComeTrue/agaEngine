@@ -57,10 +57,11 @@ namespace aga
         bool CreateDepthStencilImage();
         void DestroyDepthStencilImage();
 
-        bool CreateGraphicsPipeline();
-
         bool CreateRenderPass();
         void DestroyRenderPass();
+
+        bool CreateGraphicsPipeline();
+        void DestroyGraphicsPipeline();
 
         bool CreateFrameBuffers();
         void DestroyFrameBuffers();
@@ -108,6 +109,8 @@ namespace aga
         bool _InitDebugging();
         bool _DestroyDebugging();
 
+        VkShaderModule _CreateShaderModule(const String &data);
+
         uint32_t FindMemoryTypeIndex(const VkPhysicalDeviceMemoryProperties *memoryProperties,
                                      const VkMemoryRequirements *memoryRequirements,
                                      const VkMemoryPropertyFlags requiredPropertyFlags);
@@ -149,6 +152,9 @@ namespace aga
         VkSwapchainKHR m_SwapChain;
         uint32_t m_SwapChainImageCount;
         uint32_t m_ActiveSwapChainImageID;
+
+        VkPipelineLayout m_PipelineLayout;
+        VkPipeline m_GraphicsPipeline;
 
         VkFence m_SwapChainImageFence;
 

@@ -10,8 +10,8 @@ namespace aga
     class X11PlatformFileSystem : public PlatformFileSystemBase
     {
     public:
-        X11PlatformFileSystem();
-        ~X11PlatformFileSystem();
+        X11PlatformFileSystem() = default;
+        ~X11PlatformFileSystem() = default;
 
     public:
         String ReadEntireFileTextMode(const String &path) override;

@@ -29,6 +29,7 @@ namespace aga
     {
         m_Renderer->DestroySynchronizations();
         m_Renderer->DestroyFrameBuffers();
+        m_Renderer->DestroyGraphicsPipeline();
         m_Renderer->DestroyRenderPass();
         m_Renderer->DestroyDepthStencilImage();
         m_Renderer->DestroySwapChainImages();
@@ -61,9 +62,12 @@ namespace aga
                     {
                         if (m_Renderer->CreateRenderPass())
                         {
-                            if (m_Renderer->CreateFrameBuffers())
+                            if (m_Renderer->CreateGraphicsPipeline())
                             {
-                                return m_Renderer->CreateSynchronizations();
+                                if (m_Renderer->CreateFrameBuffers())
+                                {
+                                    return m_Renderer->CreateSynchronizations();
+                                }
                             }
                         }
                     }

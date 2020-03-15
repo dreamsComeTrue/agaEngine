@@ -13,9 +13,7 @@
 
 namespace aga
 {
-    PlatformFileSystemBase::PlatformFileSystemBase() :
-        m_Renderer(nullptr),
-        m_ShouldRun(true)
+    PlatformFileSystemBase::PlatformFileSystemBase()
     {
     }
 

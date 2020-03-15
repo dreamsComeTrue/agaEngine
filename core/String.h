@@ -16,6 +16,7 @@ namespace aga
         String(char c);
         String(uint32_t c);
         String(const char *c);
+        String(const std::vector<char> &c);
         String(const String &s);
         ~String();
 
@@ -37,7 +38,7 @@ namespace aga
 
         String &operator+=(const String &s);
 
-        const char *GetData();
+        const char *GetData() const;
 
         operator const char *() const;
 

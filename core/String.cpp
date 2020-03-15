@@ -54,17 +54,17 @@ namespace aga
 
     String::String()
     {
-        m_Length = 1;
-        m_Data = new char[m_Length];
-        m_Data[m_Length - 1] = '\0';
+        m_Length = 0;
+        m_Data = new char[1];
+        m_Data[m_Length] = '\0';
     }
 
     String::String(char c)
     {
-        m_Length = 2;
-        m_Data = new char[m_Length];
+        m_Length = 1;
+        m_Data = new char[2];
         m_Data[0] = c;
-        m_Data[m_Length - 1] = '\0';
+        m_Data[1] = '\0';
     }
 
     String::String(uint32_t c)
@@ -78,15 +78,15 @@ namespace aga
             i++;
         }
 
-        m_Length = i + 1;
-        m_Data = new char[m_Length];
+        m_Length = i;
+        m_Data = new char[m_Length + 1];
 
-        for (uint32_t j = 0; j < i; j++)
+        for (uint32_t j = 0; j < m_Length; ++j)
         {
             m_Data[j] = dest[j];
         }
-        
-        m_Data[m_Length - 1] = '\0';
+
+        m_Data[m_Length] = '\0';
     }
 
     String::String(const char *c)
@@ -100,8 +100,8 @@ namespace aga
                 n++;
             }
 
-            m_Length = n + 1;
-            m_Data = new char[m_Length];
+            m_Length = n;
+            m_Data = new char[m_Length + 1];
 
             for (uint32_t j = 0; j < n; j++)
             {
@@ -110,24 +110,45 @@ namespace aga
         }
         else
         {
-            m_Length = 1;
-            m_Data = new char[m_Length];
+            m_Length = 0;
+            m_Data = new char[1];
         }
-        
-        m_Data[m_Length - 1] = '\0';
+
+        m_Data[m_Length] = '\0';
+    }
+
+    String::String(const std::vector<char> &c)
+    {
+        if (!c.empty())
+        {
+            m_Length = c.size();
+            m_Data = new char[m_Length + 1];
+
+            for (uint32_t j = 0; j < m_Length; j++)
+            {
+                m_Data[j] = c[j];
+            }
+        }
+        else
+        {
+            m_Length = 0;
+            m_Data = new char[1];
+        }
+
+        m_Data[m_Length] = '\0';
     }
 
     String::String(const String &s)
     {
-        m_Length = s.Length() + 1;
-        m_Data = new char[m_Length];
+        m_Length = s.Length();
+        m_Data = new char[m_Length + 1];
 
-        for (uint32_t j = 0; j < m_Length - 1; j++)
+        for (uint32_t j = 0; j < m_Length; j++)
         {
             m_Data[j] = s[j];
         }
-        
-        m_Data[m_Length - 1] = '\0';
+
+        m_Data[m_Length] = '\0';
     }
 
     String::~String()
@@ -138,7 +159,7 @@ namespace aga
 
     uint32_t String::Length() const
     {
-        return m_Length - 1;
+        return m_Length;
     }
 
     int String::IndexOf(char c) const
@@ -253,49 +274,49 @@ namespace aga
 
         SAFE_DELETE_ARRAY(m_Data);
 
-        m_Length = s.Length() + 1;
-        m_Data = new char[m_Length];
+        m_Length = s.Length();
+        m_Data = new char[m_Length + 1];
 
-        for (uint32_t j = 0; j < m_Length - 1; j++)
+        for (uint32_t j = 0; j < m_Length; j++)
         {
             m_Data[j] = s[j];
         }
-        
-        m_Data[m_Length - 1] = '\0';
+
+        m_Data[m_Length] = '\0';
 
         return *this;
     }
 
-    const char *String::GetData()
+    const char *String::GetData() const
     {
         return m_Data;
     }
 
     String::operator const char *() const
     {
-        return m_Data + ;
+        return m_Data;
     }
 
     String &String::operator+=(const String &s)
     {
-        uint32_t len = m_Length + s.Length();
+        uint32_t len = m_Length + s.Length() + 1;
         char *str = new char[len];
 
-        for (uint32_t j = 0; j < m_Length - 1; j++)
+        for (uint32_t j = 0; j < m_Length; j++)
         {
             str[j] = m_Data[j];
         }
 
         for (uint32_t i = 0; i < s.Length(); i++)
         {
-            str[m_Length - 1 + i] = s[i];
+            str[m_Length + i] = s[i];
         }
 
         SAFE_DELETE_ARRAY(m_Data);
 
-        m_Length = len;
+        m_Length = len - 1;
         m_Data = str;
-        m_Data[m_Length - 1] = '\0';
+        m_Data[m_Length] = '\0';
 
         return *this;
     }
