@@ -28,6 +28,7 @@ namespace aga
     void MainLoop::DestroyRenderer()
     {
         m_Renderer->DestroySynchronizations();
+        m_Renderer->DestroyCommandPool();
         m_Renderer->DestroyFrameBuffers();
         m_Renderer->DestroyGraphicsPipeline();
         m_Renderer->DestroyRenderPass();
@@ -66,7 +67,13 @@ namespace aga
                             {
                                 if (m_Renderer->CreateFrameBuffers())
                                 {
-                                    return m_Renderer->CreateSynchronizations();
+                                    if (m_Renderer->CreateCommandPool())
+                                    {
+                                        if (m_Renderer->CreateCommandBuffers())
+                                        {
+                                            return m_Renderer->CreateSynchronizations();
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -80,7 +87,7 @@ namespace aga
 
     void MainLoop::DestroyWindow()
     {
-        vkQueueWaitIdle(m_Renderer->GetVulkanQueue());
+        vkDeviceWaitIdle(m_Renderer->GetVulkanDevice());
         SAFE_DELETE(m_PlatformWindowBase);
     }
 

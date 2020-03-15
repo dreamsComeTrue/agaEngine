@@ -9,6 +9,8 @@
 #include "platform/PlatformFileSystem.h"
 #include "platform/PlatformWindow.h"
 
+const int MAX_FRAMES_IN_PROCESS = 2;
+
 namespace aga
 {
     const std::vector<const char *> g_ValidationLayers = {"VK_LAYER_KHRONOS_validation"};
@@ -57,9 +59,7 @@ namespace aga
         m_PresentFamilyIndex(-1),
         m_GraphicsQueue(VK_NULL_HANDLE),
         m_DebugReport(VK_NULL_HANDLE),
-        m_RenderCompleteSemaphore(VK_NULL_HANDLE),
         m_CommandPool(VK_NULL_HANDLE),
-        m_CommandBuffer(VK_NULL_HANDLE),
         m_VulkanSurface(VK_NULL_HANDLE),
         m_PresentMode(VK_PRESENT_MODE_MAX_ENUM_KHR),
         m_SwapChain(VK_NULL_HANDLE),
@@ -67,8 +67,8 @@ namespace aga
         m_ActiveSwapChainImageID(0),
         m_PipelineLayout(VK_NULL_HANDLE),
         m_GraphicsPipeline(VK_NULL_HANDLE),
-        m_SwapChainImageFence(VK_NULL_HANDLE),
         m_RenderPass(VK_NULL_HANDLE),
+        m_CurrentFrame(0),
         m_DepthStencilImage(VK_NULL_HANDLE),
         m_DepthStencilImageView(VK_NULL_HANDLE),
         m_DepthStencilImageMemory(VK_NULL_HANDLE),
@@ -83,60 +83,43 @@ namespace aga
 
     bool VulkanRenderer::BeginRender()
     {
-        vkAcquireNextImageKHR(m_VulkanDevice, m_SwapChain, UINT64_MAX, VK_NULL_HANDLE,
-                              m_SwapChainImageFence, &m_ActiveSwapChainImageID);
-        if (vkWaitForFences(m_VulkanDevice, 1, &m_SwapChainImageFence, VK_TRUE, UINT64_MAX) !=
-            VK_SUCCESS)
-        {
-            LOG_ERROR_F("PlatformWindowBase Wait For Fences error\n");
+        CheckResult(
+            vkWaitForFences(m_VulkanDevice, 1, &m_SyncFences[m_CurrentFrame], VK_TRUE, UINT64_MAX),
+            "Wait For Fences error\n");
 
-            return false;
+        vkAcquireNextImageKHR(m_VulkanDevice, m_SwapChain, UINT64_MAX,
+                              m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE,
+                              &m_ActiveSwapChainImageID);
+
+        if (m_ImagesInProcess[m_ActiveSwapChainImageID] != VK_NULL_HANDLE)
+        {
+            vkWaitForFences(m_VulkanDevice, 1, &m_ImagesInProcess[m_ActiveSwapChainImageID],
+                            VK_TRUE, UINT64_MAX);
         }
 
-        if (vkResetFences(m_VulkanDevice, 1, &m_SwapChainImageFence) != VK_SUCCESS)
-        {
-            LOG_ERROR_F("PlatformWindowBase Reset Fences error\n");
-
-            return false;
-        }
-
-        if (vkQueueWaitIdle(m_GraphicsQueue) != VK_SUCCESS)
-        {
-            LOG_ERROR_F("PlatformWindowBase Queue Wait Idle error\n");
-
-            return false;
-        }
+        m_ImagesInProcess[m_ActiveSwapChainImageID] = m_SyncFences[m_CurrentFrame];
 
         return true;
     }
 
     bool VulkanRenderer::EndRender()
     {
-        std::vector<VkSemaphore> waitSemaphores = {m_RenderCompleteSemaphore};
-        VkResult presentResult = VkResult::VK_RESULT_MAX_ENUM;
+        VkSemaphore signalSemaphores[] = {m_RenderFinishedSemaphores[m_CurrentFrame]};
 
         VkPresentInfoKHR presentInfo = {};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfo.waitSemaphoreCount = waitSemaphores.size();
-        presentInfo.pWaitSemaphores = waitSemaphores.data();
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &m_SwapChain;
         presentInfo.pImageIndices = &m_ActiveSwapChainImageID;
-        presentInfo.pResults = &presentResult;
 
-        if (vkQueuePresentKHR(m_GraphicsQueue, &presentInfo) != VK_SUCCESS)
-        {
-            LOG_ERROR_F("PlatformWindowBase Queue present error\n");
+        CheckResult(vkQueuePresentKHR(m_GraphicsQueue, &presentInfo),
+                    "Vulkan Queue present error\n");
 
-            return false;
-        }
+        vkQueueWaitIdle(m_PresentQueue);
 
-        if (presentResult != VK_SUCCESS)
-        {
-            LOG_ERROR_F("PlatformWindowBase Present Result error\n");
-
-            return false;
-        }
+        m_CurrentFrame = (m_CurrentFrame + 1) % MAX_FRAMES_IN_PROCESS;
 
         return true;
     }
@@ -158,50 +141,25 @@ namespace aga
 
     bool VulkanRenderer::RenderFrame()
     {
-        VkCommandBufferBeginInfo commandBufferBeginInfo = {};
-        commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-        VkRect2D renderArea = {};
-        renderArea.offset.x = 0;
-        renderArea.offset.y = 0;
-        renderArea.extent = GetSurfaceSize();
-
-        vkBeginCommandBuffer(m_CommandBuffer, &commandBufferBeginInfo);
-        {
-            std::array<VkClearValue, 2> clearValues = {};
-            clearValues[0].depthStencil.depth = 0.0f;
-            clearValues[0].depthStencil.stencil = 0;
-
-            clearValues[1].color.float32[0] = 0.0f;
-            clearValues[1].color.float32[1] = 0.0f;
-            clearValues[1].color.float32[2] = 1.0f;
-            clearValues[1].color.float32[3] = 0.0f;
-
-            VkRenderPassBeginInfo renderPassBeginInfo = {};
-            renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassBeginInfo.renderPass = m_RenderPass;
-            renderPassBeginInfo.framebuffer = GetActiveFrameBuffer();
-            renderPassBeginInfo.renderArea = renderArea;
-            renderPassBeginInfo.clearValueCount = clearValues.size();
-            renderPassBeginInfo.pClearValues = clearValues.data();
-
-            vkCmdBeginRenderPass(m_CommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-            vkCmdEndRenderPass(m_CommandBuffer);
-        }
-        vkEndCommandBuffer(m_CommandBuffer);
+        VkSemaphore waitSemaphores[] = {m_ImageAvailableSemaphores[m_CurrentFrame]};
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        VkSemaphore signalSemaphores[] = {m_RenderFinishedSemaphores[m_CurrentFrame]};
 
         VkSubmitInfo submitInfo = {};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &m_CommandBuffer;
-        submitInfo.waitSemaphoreCount = 0;
+        submitInfo.pCommandBuffers = &m_CommandBuffers[m_ActiveSwapChainImageID];
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores;
+        submitInfo.pWaitDstStageMask = waitStages;
         submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &m_RenderCompleteSemaphore;
-        submitInfo.pWaitSemaphores = VK_NULL_HANDLE;
-        submitInfo.pWaitDstStageMask = VK_NULL_HANDLE;
+        submitInfo.pSignalSemaphores = signalSemaphores;
 
-        vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        CheckResult(vkResetFences(m_VulkanDevice, 1, &m_SyncFences[m_CurrentFrame]),
+                    "Reset Fences error\n");
+
+        CheckResult(vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, m_SyncFences[m_CurrentFrame]),
+                    "Failed to submit draw command buffer!");
 
         return true;
     }
@@ -620,12 +578,23 @@ namespace aga
         subPasses[0].pColorAttachments = subPass0ColorAttachments.data();
         subPasses[0].pDepthStencilAttachment = &subPass0DepthStencilAttachment;
 
+        VkSubpassDependency dependency = {};
+        dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+        dependency.dstSubpass = 0;
+        dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.srcAccessMask = 0;
+        dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        dependency.dstAccessMask =
+            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
         VkRenderPassCreateInfo renderPassCreateInfo = {};
         renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         renderPassCreateInfo.attachmentCount = attachments.size();
         renderPassCreateInfo.pAttachments = attachments.data();
         renderPassCreateInfo.subpassCount = subPasses.size();
         renderPassCreateInfo.pSubpasses = subPasses.data();
+        renderPassCreateInfo.dependencyCount = 1;
+        renderPassCreateInfo.pDependencies = &dependency;
 
         CheckResult(vkCreateRenderPass(m_VulkanDevice, &renderPassCreateInfo, VK_NULL_HANDLE,
                                        &m_RenderPass),
@@ -662,13 +631,9 @@ namespace aga
             frameBufferCreateInfo.height = m_SurfaceHeight;
             frameBufferCreateInfo.layers = 1;
 
-            if (vkCreateFramebuffer(m_VulkanDevice, &frameBufferCreateInfo, VK_NULL_HANDLE,
-                                    &m_FrameBuffers[i]) != VK_SUCCESS)
-            {
-                LOG_ERROR_F("VulkanRenderer Error while creating FrameBuffers\n");
-
-                return false;
-            }
+            CheckResult(vkCreateFramebuffer(m_VulkanDevice, &frameBufferCreateInfo, VK_NULL_HANDLE,
+                                            &m_FrameBuffers[i]),
+                        "VulkanRenderer Error while creating FrameBuffers\n");
         }
 
         LOG_DEBUG_F("VulkanRenderer FrameBuffer created\n");
@@ -678,9 +643,9 @@ namespace aga
 
     void VulkanRenderer::DestroyFrameBuffers()
     {
-        for (uint32_t i = 0; i < m_SwapChainImageCount; ++i)
+        for (VkFramebuffer &frameBuffer : m_FrameBuffers)
         {
-            vkDestroyFramebuffer(m_VulkanDevice, m_FrameBuffers[i], VK_NULL_HANDLE);
+            vkDestroyFramebuffer(m_VulkanDevice, frameBuffer, VK_NULL_HANDLE);
         }
 
         LOG_DEBUG_F("VulkanRenderer FrameBuffer destroyed\n");
@@ -688,10 +653,33 @@ namespace aga
 
     bool VulkanRenderer::CreateSynchronizations()
     {
-        VkFenceCreateInfo fenceCreateInfo = {};
-        fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_PROCESS);
+        m_RenderFinishedSemaphores.resize(MAX_FRAMES_IN_PROCESS);
+        m_SyncFences.resize(MAX_FRAMES_IN_PROCESS);
+        m_ImagesInProcess.resize(m_SwapChainImages.size(), VK_NULL_HANDLE);
 
-        vkCreateFence(m_VulkanDevice, &fenceCreateInfo, VK_NULL_HANDLE, &m_SwapChainImageFence);
+        VkSemaphoreCreateInfo semaphoreInfo = {};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        VkFenceCreateInfo fenceInfo = {};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_PROCESS; i++)
+        {
+            CheckResult(vkCreateSemaphore(m_VulkanDevice, &semaphoreInfo, VK_NULL_HANDLE,
+                                          &m_ImageAvailableSemaphores[i]),
+                        "Error while creating ImageAvailable semaphore");
+
+            CheckResult(vkCreateSemaphore(m_VulkanDevice, &semaphoreInfo, VK_NULL_HANDLE,
+                                          &m_RenderFinishedSemaphores[i]),
+                        "Error while creating RenderFinished semaphore");
+
+            CheckResult(
+                vkCreateFence(m_VulkanDevice, &fenceInfo, VK_NULL_HANDLE, &m_SyncFences[i]),
+                "Error while creating Sync fence");
+        }
+
         LOG_DEBUG_F("VulkanRenderer Synchronizations created\n");
 
         return true;
@@ -699,7 +687,12 @@ namespace aga
 
     void VulkanRenderer::DestroySynchronizations()
     {
-        vkDestroyFence(m_VulkanDevice, m_SwapChainImageFence, VK_NULL_HANDLE);
+        for (size_t i = 0; i < MAX_FRAMES_IN_PROCESS; i++)
+        {
+            vkDestroySemaphore(m_VulkanDevice, m_RenderFinishedSemaphores[i], VK_NULL_HANDLE);
+            vkDestroySemaphore(m_VulkanDevice, m_ImageAvailableSemaphores[i], VK_NULL_HANDLE);
+            vkDestroyFence(m_VulkanDevice, m_SyncFences[i], VK_NULL_HANDLE);
+        }
 
         LOG_DEBUG_F("VulkanRenderer Synchronizations destroyed\n");
     }
@@ -727,16 +720,11 @@ namespace aga
             return false;
         }
 
-        m_CommandPool = CreateCommandPool();
-        m_CommandBuffer = CreateCommandBuffer(m_CommandPool);
-
         return true;
     }
 
     void VulkanRenderer::Destroy()
     {
-        DestroyCommandPool(m_CommandPool);
-
         _DestroyLogicalDevice();
 
 #if BUILD_ENABLE_VULKAN_DEBUG
@@ -974,12 +962,6 @@ namespace aga
         vkGetDeviceQueue(m_VulkanDevice, m_GraphicsFamilyIndex, 0, &m_GraphicsQueue);
         vkGetDeviceQueue(m_VulkanDevice, m_PresentFamilyIndex, 0, &m_PresentQueue);
 
-        VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-        semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-        vkCreateSemaphore(m_VulkanDevice, &semaphoreCreateInfo, VK_NULL_HANDLE,
-                          &m_RenderCompleteSemaphore);
-
         LOG_DEBUG_F("Create Logical Device succeeded\n");
 
         return true;
@@ -1150,11 +1132,6 @@ namespace aga
 
     void VulkanRenderer::_DestroyLogicalDevice()
     {
-        if (m_RenderCompleteSemaphore)
-        {
-            vkDestroySemaphore(m_VulkanDevice, m_RenderCompleteSemaphore, VK_NULL_HANDLE);
-        }
-
         if (m_VulkanDevice)
         {
             vkDestroyDevice(m_VulkanDevice, VK_NULL_HANDLE);
@@ -1205,7 +1182,7 @@ namespace aga
         return true;
     }
 
-    VkCommandPool VulkanRenderer::CreateCommandPool()
+    bool VulkanRenderer::CreateCommandPool()
     {
         VkCommandPoolCreateInfo poolCreateInfo = {};
         poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -1213,30 +1190,76 @@ namespace aga
         poolCreateInfo.flags =
             VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        VkCommandPool commandPool;
-        vkCreateCommandPool(m_VulkanDevice, &poolCreateInfo, VK_NULL_HANDLE, &commandPool);
+        CheckResult(
+            vkCreateCommandPool(m_VulkanDevice, &poolCreateInfo, VK_NULL_HANDLE, &m_CommandPool),
+            "Error while creating Command Pool");
 
-        return commandPool;
+        return true;
     }
 
-    VkCommandBuffer VulkanRenderer::CreateCommandBuffer(VkCommandPool pool)
+    bool VulkanRenderer::CreateCommandBuffers()
     {
+        m_CommandBuffers.resize(m_FrameBuffers.size());
+
         VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
         commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        commandBufferAllocateInfo.commandPool = pool;
-        commandBufferAllocateInfo.commandBufferCount = 1;
+        commandBufferAllocateInfo.commandPool = m_CommandPool;
+        commandBufferAllocateInfo.commandBufferCount = (uint32_t)m_CommandBuffers.size();
         commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 
-        VkCommandBuffer commandBuffer;
-        vkAllocateCommandBuffers(m_VulkanDevice, &commandBufferAllocateInfo, &commandBuffer);
+        CheckResult(vkAllocateCommandBuffers(m_VulkanDevice, &commandBufferAllocateInfo,
+                                             m_CommandBuffers.data()),
+                    "Error while creating Command Buffers");
 
-        return commandBuffer;
+        for (size_t i = 0; i < m_CommandBuffers.size(); ++i)
+        {
+            VkCommandBufferBeginInfo commandBufferBeginInfo = {};
+            commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+            CheckResult(vkBeginCommandBuffer(m_CommandBuffers[i], &commandBufferBeginInfo),
+                        "Error while running vkBeginCommandBuffer");
+            {
+                std::array<VkClearValue, 2> clearValues = {};
+                clearValues[0].depthStencil.depth = 0.0f;
+                clearValues[0].depthStencil.stencil = 0;
+
+                clearValues[1].color.float32[0] = 0.0f;
+                clearValues[1].color.float32[1] = 0.0f;
+                clearValues[1].color.float32[2] = 1.0f;
+                clearValues[1].color.float32[3] = 0.0f;
+
+                VkRenderPassBeginInfo renderPassBeginInfo = {};
+                renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+                renderPassBeginInfo.renderPass = m_RenderPass;
+                renderPassBeginInfo.framebuffer = m_FrameBuffers[i];
+                renderPassBeginInfo.renderArea.offset = {0, 0};
+                renderPassBeginInfo.renderArea.extent = GetSurfaceSize();
+                renderPassBeginInfo.clearValueCount = clearValues.size();
+                renderPassBeginInfo.pClearValues = clearValues.data();
+
+                vkCmdBeginRenderPass(m_CommandBuffers[i], &renderPassBeginInfo,
+                                     VK_SUBPASS_CONTENTS_INLINE);
+
+                vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                  m_GraphicsPipeline);
+                vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
+
+                vkCmdEndRenderPass(m_CommandBuffers[i]);
+            }
+            CheckResult(vkEndCommandBuffer(m_CommandBuffers[i]),
+                        "Error while running vkEndCommandBuffer");
+        }
+
+        return true;
     }
 
-    void VulkanRenderer::DestroyCommandPool(VkCommandPool pool)
+    void VulkanRenderer::DestroyCommandPool()
     {
-        vkFreeCommandBuffers(m_VulkanDevice, pool, 1, &m_CommandBuffer);
-        vkDestroyCommandPool(m_VulkanDevice, pool, VK_NULL_HANDLE);
+        vkFreeCommandBuffers(m_VulkanDevice, m_CommandPool, m_CommandBuffers.size(),
+                             m_CommandBuffers.data());
+        vkDestroyCommandPool(m_VulkanDevice, m_CommandPool, VK_NULL_HANDLE);
+
+        LOG_DEBUG_F("Vulkan Command Pool destroyed\n");
     }
 
     const VkInstance VulkanRenderer::GetVulkanInstance()
@@ -1263,11 +1286,6 @@ namespace aga
     const VkQueue &VulkanRenderer::GetVulkanQueue() const
     {
         return m_GraphicsQueue;
-    }
-
-    const VkSemaphore VulkanRenderer::GetRenderCompleteSemaphore() const
-    {
-        return m_RenderCompleteSemaphore;
     }
 
     void VulkanRenderer::CheckResult(VkResult result, const String &message)

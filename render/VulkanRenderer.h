@@ -69,17 +69,16 @@ namespace aga
         bool CreateSynchronizations();
         void DestroySynchronizations();
 
-        VkCommandPool CreateCommandPool();
-        void DestroyCommandPool(VkCommandPool pool);
+        bool CreateCommandPool();
+        void DestroyCommandPool();
 
-        VkCommandBuffer CreateCommandBuffer(VkCommandPool pool);
+        bool CreateCommandBuffers();
 
         const VkInstance GetVulkanInstance();
         const VkDevice GetVulkanDevice();
         const VkPhysicalDevice GetPhysicalDevice();
         const VkPhysicalDeviceMemoryProperties &GetVulkanPhysicalDeviceMemoryProperties() const;
         const VkQueue &GetVulkanQueue() const;
-        const VkSemaphore GetRenderCompleteSemaphore() const;
 
         VkRenderPass GetRenderPass();
         VkFramebuffer GetActiveFrameBuffer();
@@ -127,9 +126,7 @@ namespace aga
         VkPhysicalDeviceMemoryProperties m_PhysicalDeviceMemoryProperties;
 
         VkCommandPool m_CommandPool;
-        VkCommandBuffer m_CommandBuffer;
-
-        VkSemaphore m_RenderCompleteSemaphore;
+        std::vector<VkCommandBuffer> m_CommandBuffers;
 
         std::vector<const char *> m_InstanceLayers;
         std::vector<const char *> m_InstanceExtensions;
@@ -156,9 +153,14 @@ namespace aga
         VkPipelineLayout m_PipelineLayout;
         VkPipeline m_GraphicsPipeline;
 
-        VkFence m_SwapChainImageFence;
+        std::vector<VkSemaphore> m_ImageAvailableSemaphores;
+        std::vector<VkSemaphore> m_RenderFinishedSemaphores;
+        std::vector<VkFence> m_SyncFences;
+        std::vector<VkFence> m_ImagesInProcess;
 
         VkRenderPass m_RenderPass;
+
+        size_t m_CurrentFrame;
 
         std::vector<VkImage> m_SwapChainImages;
         std::vector<VkImageView> m_SwapChainImagesViews;
