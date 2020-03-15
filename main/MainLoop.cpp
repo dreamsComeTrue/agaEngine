@@ -33,7 +33,6 @@ namespace aga
         m_Renderer->DestroyDepthStencilImage();
         m_Renderer->DestroySwapChainImages();
         m_Renderer->DestroySwapChain();
-        m_Renderer->DestroyVulkanSurface();
         m_Renderer->Destroy();
         SAFE_DELETE(m_Renderer);
     }
@@ -54,20 +53,17 @@ namespace aga
             m_Renderer->SetSurfaceSize(width, height);
             m_Renderer->Initialize();
 
-            if (m_Renderer->CreateVulkanSurface())
+            if (m_Renderer->CreateSwapChain())
             {
-                if (m_Renderer->CreateSwapChain())
+                if (m_Renderer->CreateSwapChainImages())
                 {
-                    if (m_Renderer->CreateSwapChainImages())
+                    if (m_Renderer->CreateDepthStencilImage())
                     {
-                        if (m_Renderer->CreateDepthStencilImage())
+                        if (m_Renderer->CreateRenderPass())
                         {
-                            if (m_Renderer->CreateRenderPass())
+                            if (m_Renderer->CreateFrameBuffers())
                             {
-                                if (m_Renderer->CreateFrameBuffers())
-                                {
-                                    return m_Renderer->CreateSynchronizations();
-                                }
+                                return m_Renderer->CreateSynchronizations();
                             }
                         }
                     }

@@ -25,6 +25,13 @@ namespace aga
         }
     };
 
+    struct SwapChainSupportDetails
+    {
+        VkSurfaceCapabilitiesKHR SurfaceCapabilities;
+        std::vector<VkSurfaceFormatKHR> Formats;
+        std::vector<VkPresentModeKHR> PresentModes;
+    };
+
     class VulkanRenderer
     {
     public:
@@ -40,9 +47,6 @@ namespace aga
         bool BeginRender();
         bool RenderFrame();
         bool EndRender();
-
-        bool CreateVulkanSurface();
-        void DestroyVulkanSurface();
 
         bool CreateSwapChain();
         void DestroySwapChain();
@@ -87,6 +91,14 @@ namespace aga
 
         bool _InitPhysicalDevice();
         QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
+        SwapChainSupportDetails FindSwapChainDetails(VkPhysicalDevice device);
+
+        VkSurfaceFormatKHR
+        _ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
+        VkPresentModeKHR
+        _ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
+        VkExtent2D _ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
+
         bool _IsPhysicalDeviceSuitable(VkPhysicalDevice device);
         bool _InitLogicalDevice();
         void _DestroyLogicalDevice();
@@ -106,6 +118,7 @@ namespace aga
         uint32_t m_GraphicsFamilyIndex;
         uint32_t m_PresentFamilyIndex;
         VkQueue m_GraphicsQueue;
+        VkQueue m_PresentQueue;
         VkPhysicalDeviceMemoryProperties m_PhysicalDeviceMemoryProperties;
 
         VkCommandPool m_CommandPool;
@@ -124,6 +137,7 @@ namespace aga
 
         uint32_t m_SurfaceWidth;
         uint32_t m_SurfaceHeight;
+        VkPresentModeKHR m_PresentMode;
         VkSurfaceKHR m_VulkanSurface;
         VkSurfaceCapabilitiesKHR m_SurfaceCapabilities;
         VkFormat m_DepthStencilFormat;
