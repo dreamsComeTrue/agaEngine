@@ -50,6 +50,62 @@ namespace aga
     PFN_vkCreateDebugReportCallbackEXT createDebugReportCallbackEXTFunc = VK_NULL_HANDLE;
     PFN_vkDestroyDebugReportCallbackEXT destroDebugReportCallbackEXTFunc = VK_NULL_HANDLE;
 
+    struct Vector2
+    {
+        float x;
+        float y;
+    };
+
+    struct Vector3
+    {
+        float x;
+        float y;
+        float z;
+    };
+
+    struct Vertex
+    {
+        Vector2 Position;
+        Vector3 Color;
+
+        static VkVertexInputBindingDescription getBindingDescription()
+        {
+            VkVertexInputBindingDescription bindingDescription = {};
+            bindingDescription.binding = 0;
+            bindingDescription.stride = sizeof(Vertex);
+            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            return bindingDescription;
+        }
+
+        static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions()
+        {
+            std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
+
+            attributeDescriptions[0].binding = 0;
+            attributeDescriptions[0].location = 0;
+            attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[0].offset = offsetof(Vertex, Position);
+
+            attributeDescriptions[1].binding = 0;
+            attributeDescriptions[1].location = 1;
+            attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+            attributeDescriptions[1].offset = offsetof(Vertex, Color);
+
+            return attributeDescriptions;
+        }
+    };
+
+    const std::vector<Vertex> vertices = {
+        {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},  // 1
+        {{0.4f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // 2
+        {{-0.4f, 0.0f}, {0.0f, 0.0f, 1.0f}},  // 3
+        //---
+        {{0.4f, 0.0f}, {0.0f, 1.0f, 0.0f}},  // 4
+        {{0.0f, 0.5f}, {1.0f, 0.0f, 0.0f}},  // 5
+        {{-0.4f, 0.0f}, {0.0f, 0.0f, 1.0f}}  // 6
+    };
+
     VulkanRenderer::VulkanRenderer() :
         m_PlatformWindow(nullptr),
         m_VulkanInstance(VK_NULL_HANDLE),
@@ -70,6 +126,8 @@ namespace aga
         m_RenderPass(VK_NULL_HANDLE),
         m_CurrentFrame(0),
         m_FramebufferResized(false),
+        m_VertexBuffer(VK_NULL_HANDLE),
+        m_VertexBufferMemory(VK_NULL_HANDLE),
         m_DepthStencilImage(VK_NULL_HANDLE),
         m_DepthStencilImageView(VK_NULL_HANDLE),
         m_DepthStencilImageMemory(VK_NULL_HANDLE),
@@ -440,8 +498,15 @@ namespace aga
 
         VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
         vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        vertexInputInfo.vertexBindingDescriptionCount = 0;
-        vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+        auto bindingDescription = Vertex::getBindingDescription();
+        auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
+        vertexInputInfo.vertexBindingDescriptionCount = 1;
+        vertexInputInfo.vertexAttributeDescriptionCount =
+            static_cast<uint32_t>(attributeDescriptions.size());
+        vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
         VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
         inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -596,7 +661,7 @@ namespace aga
         subPasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subPasses[0].colorAttachmentCount = subPass0ColorAttachments.size();
         subPasses[0].pColorAttachments = subPass0ColorAttachments.data();
-      //  subPasses[0].pDepthStencilAttachment = &subPass0DepthStencilAttachment;
+        //  subPasses[0].pDepthStencilAttachment = &subPass0DepthStencilAttachment;
 
         VkSubpassDependency dependency = {};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -639,7 +704,7 @@ namespace aga
         for (uint32_t i = 0; i < m_SwapChainImagesViews.size(); ++i)
         {
             std::array<VkImageView, 1> attachments = {};
-      //      attachments[0] = m_DepthStencilImageView;
+            //      attachments[0] = m_DepthStencilImageView;
             attachments[0] = m_SwapChainImagesViews[i];
 
             VkFramebufferCreateInfo frameBufferCreateInfo = {};
@@ -774,6 +839,11 @@ namespace aga
             return false;
         }
 
+        if (!CreateVertexBuffer())
+        {
+            return false;
+        }
+
         if (!CreateCommandBuffers())
         {
             return false;
@@ -790,10 +860,11 @@ namespace aga
     void VulkanRenderer::Destroy()
     {
         DestroySwapChain();
+        DestroyVertexBuffer();
         DestroySynchronizations();
         DestroyCommandPool();
 
-        //DestroyDepthStencilImage();
+        // DestroyDepthStencilImage();
 
         _DestroyLogicalDevice();
 
@@ -1259,6 +1330,69 @@ namespace aga
         return true;
     }
 
+    uint32_t VulkanRenderer::_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+    {
+        VkPhysicalDeviceMemoryProperties memProperties;
+        vkGetPhysicalDeviceMemoryProperties(m_VulkanPhysicalDevice, &memProperties);
+
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
+        {
+            if ((typeFilter & (1 << i)) &&
+                (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+            {
+                return i;
+            }
+        }
+
+        CheckResult(VK_ERROR_UNKNOWN, "Failed to find suitable memory type!");
+
+        return -1;
+    }
+
+    bool VulkanRenderer::CreateVertexBuffer()
+    {
+        VkBufferCreateInfo bufferInfo = {};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = sizeof(vertices[0]) * vertices.size();
+        bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        CheckResult(vkCreateBuffer(m_VulkanDevice, &bufferInfo, nullptr, &m_VertexBuffer),
+                    "Failed to create vertex buffer!");
+
+        VkMemoryRequirements memRequirements;
+        vkGetBufferMemoryRequirements(m_VulkanDevice, m_VertexBuffer, &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = _FindMemoryType(memRequirements.memoryTypeBits,
+                                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+        CheckResult(vkAllocateMemory(m_VulkanDevice, &allocInfo, nullptr, &m_VertexBufferMemory),
+                    "Failed to allocate vertex buffer memory!");
+
+        vkBindBufferMemory(m_VulkanDevice, m_VertexBuffer, m_VertexBufferMemory, 0);
+
+        void *data;
+        vkMapMemory(m_VulkanDevice, m_VertexBufferMemory, 0, bufferInfo.size, 0, &data);
+        memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+        vkUnmapMemory(m_VulkanDevice, m_VertexBufferMemory);
+
+        LOG_DEBUG_F("Vulkan Vertex Buffer created\n");
+
+        return true;
+    }
+
+    void VulkanRenderer::DestroyVertexBuffer()
+    {
+        vkDestroyBuffer(m_VulkanDevice, m_VertexBuffer, nullptr);
+        vkFreeMemory(m_VulkanDevice, m_VertexBufferMemory, nullptr);
+
+        LOG_DEBUG_F("Vulkan Vertex Buffer destroyed\n");
+    }
+
     bool VulkanRenderer::CreateCommandBuffers()
     {
         m_CommandBuffers.resize(m_FrameBuffers.size());
@@ -1282,8 +1416,8 @@ namespace aga
                         "Error while running vkBeginCommandBuffer");
             {
                 std::array<VkClearValue, 1> clearValues = {};
-             //   clearValues[0].depthStencil.depth = 0.0f;
-            //    clearValues[0].depthStencil.stencil = 0;
+                //   clearValues[0].depthStencil.depth = 0.0f;
+                //    clearValues[0].depthStencil.stencil = 0;
 
                 clearValues[0].color.float32[0] = 0.0f;
                 clearValues[0].color.float32[1] = 0.0f;
@@ -1304,7 +1438,12 @@ namespace aga
 
                 vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
                                   m_GraphicsPipeline);
-                vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
+
+                VkBuffer vertexBuffers[] = {m_VertexBuffer};
+                VkDeviceSize offsets[] = {0};
+                vkCmdBindVertexBuffers(m_CommandBuffers[i], 0, 1, vertexBuffers, offsets);
+
+                vkCmdDraw(m_CommandBuffers[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 
                 vkCmdEndRenderPass(m_CommandBuffers[i]);
             }

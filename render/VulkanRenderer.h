@@ -72,6 +72,9 @@ namespace aga
         bool CreateCommandPool();
         void DestroyCommandPool();
 
+        bool CreateVertexBuffer();
+        void DestroyVertexBuffer();
+
         bool CreateCommandBuffers();
 
         const VkInstance GetVulkanInstance();
@@ -115,6 +118,7 @@ namespace aga
         uint32_t FindMemoryTypeIndex(const VkPhysicalDeviceMemoryProperties *memoryProperties,
                                      const VkMemoryRequirements *memoryRequirements,
                                      const VkMemoryPropertyFlags requiredPropertyFlags);
+        uint32_t _FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     private:
         PlatformWindowBase *m_PlatformWindow;
@@ -168,6 +172,9 @@ namespace aga
         std::vector<VkImage> m_SwapChainImages;
         std::vector<VkImageView> m_SwapChainImagesViews;
         std::vector<VkFramebuffer> m_FrameBuffers;
+
+        VkBuffer m_VertexBuffer;
+        VkDeviceMemory m_VertexBufferMemory;
 
         VkImage m_DepthStencilImage;
         VkDeviceMemory m_DepthStencilImageMemory;
