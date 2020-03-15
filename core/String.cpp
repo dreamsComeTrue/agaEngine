@@ -273,7 +273,7 @@ namespace aga
 
     String::operator const char *() const
     {
-        return m_Data;
+        return m_Data + ;
     }
 
     String &String::operator+=(const String &s)

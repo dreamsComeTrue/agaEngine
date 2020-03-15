@@ -57,6 +57,8 @@ namespace aga
         bool CreateDepthStencilImage();
         void DestroyDepthStencilImage();
 
+        bool CreateGraphicsPipeline();
+
         bool CreateRenderPass();
         void DestroyRenderPass();
 

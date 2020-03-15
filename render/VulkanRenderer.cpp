@@ -7,6 +7,7 @@
 #include "core/Typedefs.h"
 #include "platform/Platform.h"
 #include "platform/PlatformWindow.h"
+#include "platform/PlatformFileSystem.h"
 
 namespace aga
 {
@@ -430,6 +431,10 @@ namespace aga
         m_DepthStencilImage = VK_NULL_HANDLE;
 
         LOG_DEBUG_F("VulkanRenderer DepthStencil Image destroyed\n");
+    }
+
+    bool VulkanRenderer::CreateGraphicsPipeline()
+    {
     }
 
     bool VulkanRenderer::CreateRenderPass()
