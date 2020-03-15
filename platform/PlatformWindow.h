@@ -19,8 +19,9 @@ namespace aga
         virtual bool Initialize(const char *title, uint32_t width = 1280,
                                 uint32_t height = 800) = 0;
         virtual void Destroy() = 0;
-
         virtual bool Update() = 0;
+
+        virtual VkExtent2D GetCurrentWindowSize() = 0;
 
         void Close();
 

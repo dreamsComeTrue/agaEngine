@@ -129,6 +129,25 @@ namespace aga
         return m_ShouldRun;
     }
 
+    VkExtent2D X11PlatformWindow::GetCurrentWindowSize()
+    {
+        xcb_get_geometry_reply_t *geom = xcb_get_geometry_reply(
+            m_XCBConnection, xcb_get_geometry(m_XCBConnection, m_XCBWindow), NULL);
+        if (!geom)
+        {
+            return VkExtent2D{0, 0};
+        }
+
+        VkExtent2D size;
+
+        size.width = geom->width;
+        size.height = geom->height;
+
+        free(geom);
+
+        return size;
+    }
+
     void X11PlatformWindow::_HandleEvent(const xcb_generic_event_t *event)
     {
         switch (event->response_type & 0x7f)
@@ -220,6 +239,8 @@ namespace aga
             {
                 const xcb_configure_notify_event_t *cfgEvent =
                     (const xcb_configure_notify_event_t *)event;
+
+                m_Renderer->SetFrameBufferResized(true);
                 // if ((prepared) && ((cfgEvent->width != width) || (cfgEvent->height != height)))
                 // {
                 //     destWidth = cfgEvent->width;

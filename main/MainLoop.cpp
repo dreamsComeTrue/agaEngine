@@ -27,14 +27,6 @@ namespace aga
 
     void MainLoop::DestroyRenderer()
     {
-        m_Renderer->DestroySynchronizations();
-        m_Renderer->DestroyCommandPool();
-        m_Renderer->DestroyFrameBuffers();
-        m_Renderer->DestroyGraphicsPipeline();
-        m_Renderer->DestroyRenderPass();
-        m_Renderer->DestroyDepthStencilImage();
-        m_Renderer->DestroySwapChainImages();
-        m_Renderer->DestroySwapChain();
         m_Renderer->Destroy();
         SAFE_DELETE(m_Renderer);
     }
@@ -52,34 +44,9 @@ namespace aga
         if (m_PlatformWindowBase->Initialize(title, width, height))
         {
             m_Renderer->SetPlatformWindow(m_PlatformWindowBase);
-            m_Renderer->SetSurfaceSize(width, height);
-            m_Renderer->Initialize();
-
-            if (m_Renderer->CreateSwapChain())
-            {
-                if (m_Renderer->CreateSwapChainImages())
-                {
-                    if (m_Renderer->CreateDepthStencilImage())
-                    {
-                        if (m_Renderer->CreateRenderPass())
-                        {
-                            if (m_Renderer->CreateGraphicsPipeline())
-                            {
-                                if (m_Renderer->CreateFrameBuffers())
-                                {
-                                    if (m_Renderer->CreateCommandPool())
-                                    {
-                                        if (m_Renderer->CreateCommandBuffers())
-                                        {
-                                            return m_Renderer->CreateSynchronizations();
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            
+            
+            return m_Renderer->Initialize();
         }
 
         return false;

@@ -69,6 +69,7 @@ namespace aga
         m_GraphicsPipeline(VK_NULL_HANDLE),
         m_RenderPass(VK_NULL_HANDLE),
         m_CurrentFrame(0),
+        m_FramebufferResized(false),
         m_DepthStencilImage(VK_NULL_HANDLE),
         m_DepthStencilImageView(VK_NULL_HANDLE),
         m_DepthStencilImageMemory(VK_NULL_HANDLE),
@@ -87,9 +88,21 @@ namespace aga
             vkWaitForFences(m_VulkanDevice, 1, &m_SyncFences[m_CurrentFrame], VK_TRUE, UINT64_MAX),
             "Wait For Fences error\n");
 
-        vkAcquireNextImageKHR(m_VulkanDevice, m_SwapChain, UINT64_MAX,
-                              m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE,
-                              &m_ActiveSwapChainImageID);
+        VkResult result = vkAcquireNextImageKHR(m_VulkanDevice, m_SwapChain, UINT64_MAX,
+                                                m_ImageAvailableSemaphores[m_CurrentFrame],
+                                                VK_NULL_HANDLE, &m_ActiveSwapChainImageID);
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            RecreateSwapChain();
+            return true;
+        }
+        else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+        {
+            LOG_ERROR_F("Failed to acquire swap chain image!");
+
+            return false;
+        }
 
         if (m_ImagesInProcess[m_ActiveSwapChainImageID] != VK_NULL_HANDLE)
         {
@@ -114,10 +127,21 @@ namespace aga
         presentInfo.pSwapchains = &m_SwapChain;
         presentInfo.pImageIndices = &m_ActiveSwapChainImageID;
 
-        CheckResult(vkQueuePresentKHR(m_GraphicsQueue, &presentInfo),
-                    "Vulkan Queue present error\n");
+        VkResult result = vkQueuePresentKHR(m_GraphicsQueue, &presentInfo);
 
-        vkQueueWaitIdle(m_PresentQueue);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
+            m_FramebufferResized)
+        {
+            m_FramebufferResized = false;
+
+            RecreateSwapChain();
+        }
+        else if (result != VK_SUCCESS)
+        {
+            LOG_ERROR_F("Failed to present swap chain image!");
+
+            return false;
+        }
 
         m_CurrentFrame = (m_CurrentFrame + 1) % MAX_FRAMES_IN_PROCESS;
 
@@ -172,8 +196,8 @@ namespace aga
         m_PresentMode = _ChooseSwapPresentMode(swapChainSupport.PresentModes);
 
         VkExtent2D extent = _ChooseSwapExtent(swapChainSupport.SurfaceCapabilities);
-        m_SurfaceWidth = swapChainSupport.SurfaceCapabilities.currentExtent.width;
-        m_SurfaceHeight = swapChainSupport.SurfaceCapabilities.currentExtent.height;
+        m_SurfaceWidth = extent.width;
+        m_SurfaceHeight = extent.height;
 
         m_SwapChainImageCount = swapChainSupport.SurfaceCapabilities.minImageCount + 1;
 
@@ -217,30 +241,24 @@ namespace aga
                                          &m_SwapChain),
                     "VulkanRenderer CreateSwapChain failed\n");
 
-        LOG_DEBUG_F("VulkanRenderer Vulkan SwapChain created\n");
-
-        return true;
-    }
-
-    void VulkanRenderer::DestroySwapChain()
-    {
-        vkDestroySwapchainKHR(m_VulkanDevice, m_SwapChain, VK_NULL_HANDLE);
-
-        LOG_DEBUG_F("VulkanRenderer Vulkan SwapChain destroyed\n");
-    }
-
-    bool VulkanRenderer::CreateSwapChainImages()
-    {
         CheckResult(vkGetSwapchainImagesKHR(m_VulkanDevice, m_SwapChain, &m_SwapChainImageCount,
                                             VK_NULL_HANDLE),
                     "VulkanRenderer GetSwapchainImages failed\n");
 
         m_SwapChainImages.resize(m_SwapChainImageCount);
-        m_SwapChainImagesViews.resize(m_SwapChainImageCount);
 
         CheckResult(vkGetSwapchainImagesKHR(m_VulkanDevice, m_SwapChain, &m_SwapChainImageCount,
                                             m_SwapChainImages.data()),
                     "VulkanRenderer GetSwapchainImages failed\n");
+
+        LOG_DEBUG_F("VulkanRenderer Vulkan SwapChain created\n");
+
+        return true;
+    }
+
+    bool VulkanRenderer::CreateSwapChainImages()
+    {
+        m_SwapChainImagesViews.resize(m_SwapChainImageCount);
 
         for (uint32_t i = 0; i < m_SwapChainImageCount; ++i)
         {
@@ -271,10 +289,13 @@ namespace aga
 
     void VulkanRenderer::DestroySwapChainImages()
     {
-        for (VkImageView imageView : m_SwapChainImagesViews)
+        for (int i = 0; i < m_SwapChainImagesViews.size(); ++i)
         {
-            vkDestroyImageView(m_VulkanDevice, imageView, VK_NULL_HANDLE);
+            vkDestroyImageView(m_VulkanDevice, m_SwapChainImagesViews[i], VK_NULL_HANDLE);
+            m_SwapChainImagesViews[i] = VK_NULL_HANDLE;
         }
+
+        m_SwapChainImagesViews.clear();
 
         LOG_DEBUG_F("VulkanRenderer Vulkan SwapChain Images destroyed\n");
     }
@@ -430,8 +451,8 @@ namespace aga
         VkViewport viewport = {};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
-        viewport.width = m_SurfaceWidth;
-        viewport.height = m_SurfaceHeight;
+        viewport.width = (float)m_SurfaceWidth;
+        viewport.height = (float)m_SurfaceHeight;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
 
@@ -461,9 +482,9 @@ namespace aga
         multisampling.sampleShadingEnable = VK_FALSE;
         multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-        VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = {};
-        depthStencilStateCreateInfo.sType =
-            VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        // VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = {};
+        // depthStencilStateCreateInfo.sType =
+        //     VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 
         VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
         colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
@@ -499,7 +520,7 @@ namespace aga
         pipelineCreateInfo.pViewportState = &viewportState;
         pipelineCreateInfo.pRasterizationState = &rasterizer;
         pipelineCreateInfo.pMultisampleState = &multisampling;
-        pipelineCreateInfo.pDepthStencilState = &depthStencilStateCreateInfo;
+        // pipelineCreateInfo.pDepthStencilState = VK_NULL_HANDLE;
         pipelineCreateInfo.pColorBlendState = &colorBlending;
         pipelineCreateInfo.layout = m_PipelineLayout;
         pipelineCreateInfo.renderPass = m_RenderPass;
@@ -543,40 +564,39 @@ namespace aga
 
     bool VulkanRenderer::CreateRenderPass()
     {
-        std::array<VkAttachmentDescription, 2> attachments = {};
-        attachments[0].flags = 0;
-        attachments[0].format = m_DepthStencilFormat;
+        std::array<VkAttachmentDescription, 1> attachments = {};
+        // attachments[0].flags = 0;
+        // attachments[0].format = m_DepthStencilFormat;
+        // attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+        // attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        // attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        // attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        // attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+        // attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        // attachments[0].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        attachments[0].format = m_SurfaceFormat.format;
         attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[0].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-        attachments[1].flags = 0;
-        attachments[1].format = m_SurfaceFormat.format;
-        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        attachments[1].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-        VkAttachmentReference subPass0DepthStencilAttachment = {};
-        subPass0DepthStencilAttachment.attachment = 0;
-        subPass0DepthStencilAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        // VkAttachmentReference subPass0DepthStencilAttachment = {};
+        // subPass0DepthStencilAttachment.attachment = 0;
+        // subPass0DepthStencilAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
         std::array<VkAttachmentReference, 1> subPass0ColorAttachments = {};
-        subPass0ColorAttachments[0].attachment = 1;
+        subPass0ColorAttachments[0].attachment = 0;
         subPass0ColorAttachments[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         std::array<VkSubpassDescription, 1> subPasses = {};
         subPasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subPasses[0].colorAttachmentCount = subPass0ColorAttachments.size();
         subPasses[0].pColorAttachments = subPass0ColorAttachments.data();
-        subPasses[0].pDepthStencilAttachment = &subPass0DepthStencilAttachment;
+      //  subPasses[0].pDepthStencilAttachment = &subPass0DepthStencilAttachment;
 
         VkSubpassDependency dependency = {};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -614,13 +634,13 @@ namespace aga
 
     bool VulkanRenderer::CreateFrameBuffers()
     {
-        m_FrameBuffers.resize(m_SwapChainImageCount);
+        m_FrameBuffers.resize(m_SwapChainImagesViews.size());
 
-        for (uint32_t i = 0; i < m_SwapChainImageCount; ++i)
+        for (uint32_t i = 0; i < m_SwapChainImagesViews.size(); ++i)
         {
-            std::array<VkImageView, 2> attachments = {};
-            attachments[0] = m_DepthStencilImageView;
-            attachments[1] = m_SwapChainImagesViews[i];
+            std::array<VkImageView, 1> attachments = {};
+      //      attachments[0] = m_DepthStencilImageView;
+            attachments[0] = m_SwapChainImagesViews[i];
 
             VkFramebufferCreateInfo frameBufferCreateInfo = {};
             frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -665,7 +685,7 @@ namespace aga
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-        for (size_t i = 0; i < MAX_FRAMES_IN_PROCESS; i++)
+        for (size_t i = 0; i < MAX_FRAMES_IN_PROCESS; ++i)
         {
             CheckResult(vkCreateSemaphore(m_VulkanDevice, &semaphoreInfo, VK_NULL_HANDLE,
                                           &m_ImageAvailableSemaphores[i]),
@@ -675,9 +695,8 @@ namespace aga
                                           &m_RenderFinishedSemaphores[i]),
                         "Error while creating RenderFinished semaphore");
 
-            CheckResult(
-                vkCreateFence(m_VulkanDevice, &fenceInfo, VK_NULL_HANDLE, &m_SyncFences[i]),
-                "Error while creating Sync fence");
+            CheckResult(vkCreateFence(m_VulkanDevice, &fenceInfo, VK_NULL_HANDLE, &m_SyncFences[i]),
+                        "Error while creating Sync fence");
         }
 
         LOG_DEBUG_F("VulkanRenderer Synchronizations created\n");
@@ -687,7 +706,7 @@ namespace aga
 
     void VulkanRenderer::DestroySynchronizations()
     {
-        for (size_t i = 0; i < MAX_FRAMES_IN_PROCESS; i++)
+        for (size_t i = 0; i < MAX_FRAMES_IN_PROCESS; ++i)
         {
             vkDestroySemaphore(m_VulkanDevice, m_RenderFinishedSemaphores[i], VK_NULL_HANDLE);
             vkDestroySemaphore(m_VulkanDevice, m_ImageAvailableSemaphores[i], VK_NULL_HANDLE);
@@ -720,11 +739,62 @@ namespace aga
             return false;
         }
 
+        if (!CreateSwapChain())
+        {
+            return false;
+        }
+
+        if (!CreateSwapChainImages())
+        {
+            return false;
+        }
+
+        // if (!CreateDepthStencilImage())
+        // {
+        //     return false;
+        // }
+
+        if (!CreateRenderPass())
+        {
+            return false;
+        }
+
+        if (!CreateGraphicsPipeline())
+        {
+            return false;
+        }
+
+        if (!CreateFrameBuffers())
+        {
+            return false;
+        }
+
+        if (!CreateCommandPool())
+        {
+            return false;
+        }
+
+        if (!CreateCommandBuffers())
+        {
+            return false;
+        }
+
+        if (!CreateSynchronizations())
+        {
+            return false;
+        }
+
         return true;
     }
 
     void VulkanRenderer::Destroy()
     {
+        DestroySwapChain();
+        DestroySynchronizations();
+        DestroyCommandPool();
+
+        //DestroyDepthStencilImage();
+
         _DestroyLogicalDevice();
 
 #if BUILD_ENABLE_VULKAN_DEBUG
@@ -737,12 +807,6 @@ namespace aga
     void VulkanRenderer::SetPlatformWindow(PlatformWindowBase *window)
     {
         m_PlatformWindow = window;
-    }
-
-    void VulkanRenderer::SetSurfaceSize(uint32_t width, uint32_t height)
-    {
-        m_SurfaceWidth = width;
-        m_SurfaceHeight = height;
     }
 
     void VulkanRenderer::_PrepareExtensions()
@@ -1117,7 +1181,7 @@ namespace aga
         }
         else
         {
-            VkExtent2D actualExtent = {m_SurfaceWidth, m_SurfaceHeight};
+            VkExtent2D actualExtent = m_PlatformWindow->GetCurrentWindowSize();
 
             actualExtent.width =
                 std::max(capabilities.minImageExtent.width,
@@ -1187,8 +1251,6 @@ namespace aga
         VkCommandPoolCreateInfo poolCreateInfo = {};
         poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolCreateInfo.queueFamilyIndex = m_GraphicsFamilyIndex;
-        poolCreateInfo.flags =
-            VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
         CheckResult(
             vkCreateCommandPool(m_VulkanDevice, &poolCreateInfo, VK_NULL_HANDLE, &m_CommandPool),
@@ -1219,14 +1281,14 @@ namespace aga
             CheckResult(vkBeginCommandBuffer(m_CommandBuffers[i], &commandBufferBeginInfo),
                         "Error while running vkBeginCommandBuffer");
             {
-                std::array<VkClearValue, 2> clearValues = {};
-                clearValues[0].depthStencil.depth = 0.0f;
-                clearValues[0].depthStencil.stencil = 0;
+                std::array<VkClearValue, 1> clearValues = {};
+             //   clearValues[0].depthStencil.depth = 0.0f;
+            //    clearValues[0].depthStencil.stencil = 0;
 
-                clearValues[1].color.float32[0] = 0.0f;
-                clearValues[1].color.float32[1] = 0.0f;
-                clearValues[1].color.float32[2] = 1.0f;
-                clearValues[1].color.float32[3] = 0.0f;
+                clearValues[0].color.float32[0] = 0.0f;
+                clearValues[0].color.float32[1] = 0.0f;
+                clearValues[0].color.float32[2] = 1.0f;
+                clearValues[0].color.float32[3] = 0.0f;
 
                 VkRenderPassBeginInfo renderPassBeginInfo = {};
                 renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1255,11 +1317,48 @@ namespace aga
 
     void VulkanRenderer::DestroyCommandPool()
     {
-        vkFreeCommandBuffers(m_VulkanDevice, m_CommandPool, m_CommandBuffers.size(),
-                             m_CommandBuffers.data());
         vkDestroyCommandPool(m_VulkanDevice, m_CommandPool, VK_NULL_HANDLE);
 
         LOG_DEBUG_F("Vulkan Command Pool destroyed\n");
+    }
+
+    void VulkanRenderer::DestroySwapChain()
+    {
+        DestroyFrameBuffers();
+
+        vkFreeCommandBuffers(m_VulkanDevice, m_CommandPool,
+                             static_cast<uint32_t>(m_CommandBuffers.size()),
+                             m_CommandBuffers.data());
+
+        DestroyGraphicsPipeline();
+        DestroyRenderPass();
+        DestroySwapChainImages();
+
+        vkDestroySwapchainKHR(m_VulkanDevice, m_SwapChain, VK_NULL_HANDLE);
+
+        LOG_DEBUG_F("VulkanRenderer Vulkan SwapChain destroyed\n");
+    }
+
+    void VulkanRenderer::RecreateSwapChain()
+    {
+        VkExtent2D winSize = m_PlatformWindow->GetCurrentWindowSize();
+
+        while (winSize.width == 0 || winSize.height == 0)
+        {
+            winSize = m_PlatformWindow->GetCurrentWindowSize();
+            m_PlatformWindow->Update();
+        }
+
+        vkDeviceWaitIdle(m_VulkanDevice);
+
+        DestroySwapChain();
+
+        CreateSwapChain();
+        CreateSwapChainImages();
+        CreateRenderPass();
+        CreateGraphicsPipeline();
+        CreateFrameBuffers();
+        CreateCommandBuffers();
     }
 
     const VkInstance VulkanRenderer::GetVulkanInstance()
@@ -1296,6 +1395,11 @@ namespace aga
 
             std::exit(-1);
         }
+    }
+
+    void VulkanRenderer::SetFrameBufferResized(bool resized)
+    {
+        m_FramebufferResized = resized;
     }
 
     uint32_t

@@ -42,7 +42,6 @@ namespace aga
         void Destroy();
 
         void SetPlatformWindow(PlatformWindowBase *window);
-        void SetSurfaceSize(uint32_t width, uint32_t height);
 
         bool BeginRender();
         bool RenderFrame();
@@ -50,6 +49,7 @@ namespace aga
 
         bool CreateSwapChain();
         void DestroySwapChain();
+        void RecreateSwapChain();
 
         bool CreateSwapChainImages();
         void DestroySwapChainImages();
@@ -83,6 +83,8 @@ namespace aga
         VkRenderPass GetRenderPass();
         VkFramebuffer GetActiveFrameBuffer();
         VkExtent2D GetSurfaceSize();
+
+        void SetFrameBufferResized(bool resized);
 
         static void CheckResult(VkResult result, const String &message);
 
@@ -161,6 +163,7 @@ namespace aga
         VkRenderPass m_RenderPass;
 
         size_t m_CurrentFrame;
+        bool m_FramebufferResized;
 
         std::vector<VkImage> m_SwapChainImages;
         std::vector<VkImageView> m_SwapChainImagesViews;
