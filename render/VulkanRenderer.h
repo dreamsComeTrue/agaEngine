@@ -3,6 +3,7 @@
 #pragma once
 
 #include "core/String.h"
+#include "core/math/Rect2D.h"
 #include "platform/Platform.h"
 
 namespace aga
@@ -85,7 +86,7 @@ namespace aga
 
         VkRenderPass GetRenderPass();
         VkFramebuffer GetActiveFrameBuffer();
-        VkExtent2D GetSurfaceSize();
+        Rect2D GetSurfaceSize();
 
         void SetFrameBufferResized(bool resized);
 
@@ -104,7 +105,7 @@ namespace aga
         _ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
         VkPresentModeKHR
         _ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
-        VkExtent2D _ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
+        Rect2D _ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 
         bool _IsPhysicalDeviceSuitable(VkPhysicalDevice device);
         bool _InitLogicalDevice();

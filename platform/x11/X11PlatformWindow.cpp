@@ -129,19 +129,16 @@ namespace aga
         return m_ShouldRun;
     }
 
-    VkExtent2D X11PlatformWindow::GetCurrentWindowSize()
+    Vector2 X11PlatformWindow::GetCurrentWindowSize()
     {
         xcb_get_geometry_reply_t *geom = xcb_get_geometry_reply(
             m_XCBConnection, xcb_get_geometry(m_XCBConnection, m_XCBWindow), NULL);
         if (!geom)
         {
-            return VkExtent2D{0, 0};
+            return Vector2();
         }
 
-        VkExtent2D size;
-
-        size.width = geom->width;
-        size.height = geom->height;
+        Vector2 size(geom->width, geom->height);
 
         free(geom);
 

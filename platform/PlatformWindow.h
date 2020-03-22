@@ -4,6 +4,7 @@
 
 #include "core/String.h"
 #include "core/Typedefs.h"
+#include "core/math/Vector2.h"
 #include "platform/Platform.h"
 
 namespace aga
@@ -21,7 +22,7 @@ namespace aga
         virtual void Destroy() = 0;
         virtual bool Update() = 0;
 
-        virtual VkExtent2D GetCurrentWindowSize() = 0;
+        virtual Vector2 GetCurrentWindowSize() = 0;
 
         void Close();
 

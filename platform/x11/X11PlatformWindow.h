@@ -20,7 +20,7 @@ namespace aga
         void Destroy() override;
         bool Update() override;
         
-        VkExtent2D GetCurrentWindowSize();
+        Vector2 GetCurrentWindowSize();
 
         void _HandleEvent(const xcb_generic_event_t *event);
 

@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 typedef unsigned int uint32_t;
+typedef float real_t;
 
 #define ENGINE_NAME "agaEngine"
 #define ENGINE_VERSION_MAJOR 0

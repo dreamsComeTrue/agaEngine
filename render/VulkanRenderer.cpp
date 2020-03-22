@@ -5,6 +5,8 @@
 #include "core/Common.h"
 #include "core/Logger.h"
 #include "core/Typedefs.h"
+#include "core/math/Vector2.h"
+#include "core/math/Vector3.h"
 #include "platform/Platform.h"
 #include "platform/PlatformFileSystem.h"
 #include "platform/PlatformWindow.h"
@@ -49,19 +51,6 @@ namespace aga
 
     PFN_vkCreateDebugReportCallbackEXT createDebugReportCallbackEXTFunc = VK_NULL_HANDLE;
     PFN_vkDestroyDebugReportCallbackEXT destroDebugReportCallbackEXTFunc = VK_NULL_HANDLE;
-
-    struct Vector2
-    {
-        float x;
-        float y;
-    };
-
-    struct Vector3
-    {
-        float x;
-        float y;
-        float z;
-    };
 
     struct Vertex
     {
@@ -216,9 +205,9 @@ namespace aga
         return m_FrameBuffers[m_ActiveSwapChainImageID];
     }
 
-    VkExtent2D VulkanRenderer::GetSurfaceSize()
+    Rect2D VulkanRenderer::GetSurfaceSize()
     {
-        return {m_SurfaceWidth, m_SurfaceHeight};
+        return {0.0f, 0.0f, (float)m_SurfaceWidth, (float)m_SurfaceHeight};
     }
 
     bool VulkanRenderer::RenderFrame()
@@ -253,9 +242,9 @@ namespace aga
         m_SurfaceFormat = _ChooseSwapSurfaceFormat(swapChainSupport.Formats);
         m_PresentMode = _ChooseSwapPresentMode(swapChainSupport.PresentModes);
 
-        VkExtent2D extent = _ChooseSwapExtent(swapChainSupport.SurfaceCapabilities);
-        m_SurfaceWidth = extent.width;
-        m_SurfaceHeight = extent.height;
+        Rect2D extent = _ChooseSwapExtent(swapChainSupport.SurfaceCapabilities);
+        m_SurfaceWidth = extent.Size.Width;
+        m_SurfaceHeight = extent.Size.Height;
 
         m_SwapChainImageCount = swapChainSupport.SurfaceCapabilities.minImageCount + 1;
 
@@ -271,7 +260,8 @@ namespace aga
         swapChainCreateInfo.minImageCount = m_SwapChainImageCount;
         swapChainCreateInfo.imageFormat = m_SurfaceFormat.format;
         swapChainCreateInfo.imageColorSpace = m_SurfaceFormat.colorSpace;
-        swapChainCreateInfo.imageExtent = extent;
+        swapChainCreateInfo.imageExtent.width = extent.Size.Width;
+        swapChainCreateInfo.imageExtent.height = extent.Size.Height;
         swapChainCreateInfo.imageArrayLayers = 1;
         swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         swapChainCreateInfo.preTransform = swapChainSupport.SurfaceCapabilities.currentTransform;
@@ -523,7 +513,8 @@ namespace aga
 
         VkRect2D scissor = {};
         scissor.offset = {0, 0};
-        scissor.extent = GetSurfaceSize();
+        scissor.extent.width = GetSurfaceSize().Size.Width;
+        scissor.extent.height = GetSurfaceSize().Size.Height;
 
         VkPipelineViewportStateCreateInfo viewportState = {};
         viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -1244,24 +1235,25 @@ namespace aga
         return VK_PRESENT_MODE_FIFO_KHR;
     }
 
-    VkExtent2D VulkanRenderer::_ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
+    Rect2D VulkanRenderer::_ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
     {
         if (capabilities.currentExtent.width != UINT32_MAX)
         {
-            return capabilities.currentExtent;
+            return Rect2D{0.0f, 0.0f, (float)capabilities.currentExtent.width,
+                          (float)capabilities.currentExtent.height};
         }
         else
         {
-            VkExtent2D actualExtent = m_PlatformWindow->GetCurrentWindowSize();
+            Vector2 actualExtent = m_PlatformWindow->GetCurrentWindowSize();
 
-            actualExtent.width =
-                std::max(capabilities.minImageExtent.width,
-                         std::min(capabilities.maxImageExtent.width, actualExtent.width));
-            actualExtent.height =
-                std::max(capabilities.minImageExtent.height,
-                         std::min(capabilities.maxImageExtent.height, actualExtent.height));
+            actualExtent.Width =
+                std::max((float)capabilities.minImageExtent.width,
+                         std::min((float)capabilities.maxImageExtent.width, actualExtent.Width));
+            actualExtent.Height =
+                std::max((float)capabilities.minImageExtent.height,
+                         std::min((float)capabilities.maxImageExtent.height, actualExtent.Height));
 
-            return actualExtent;
+            return Rect2D{0.0f, 0.0f, actualExtent.Width, actualExtent.Height};
         }
     }
 
@@ -1373,7 +1365,8 @@ namespace aga
         CheckResult(vkAllocateMemory(m_VulkanDevice, &allocInfo, nullptr, &m_VertexBufferMemory),
                     "Failed to allocate vertex buffer memory!");
 
-        vkBindBufferMemory(m_VulkanDevice, m_VertexBuffer, m_VertexBufferMemory, 0);
+        CheckResult(vkBindBufferMemory(m_VulkanDevice, m_VertexBuffer, m_VertexBufferMemory, 0),
+                    "Can't bind memory for Vertex Buffer");
 
         void *data;
         vkMapMemory(m_VulkanDevice, m_VertexBufferMemory, 0, bufferInfo.size, 0, &data);
@@ -1429,7 +1422,8 @@ namespace aga
                 renderPassBeginInfo.renderPass = m_RenderPass;
                 renderPassBeginInfo.framebuffer = m_FrameBuffers[i];
                 renderPassBeginInfo.renderArea.offset = {0, 0};
-                renderPassBeginInfo.renderArea.extent = GetSurfaceSize();
+                renderPassBeginInfo.renderArea.extent.width = GetSurfaceSize().Size.Width;
+                renderPassBeginInfo.renderArea.extent.height = GetSurfaceSize().Size.Height;
                 renderPassBeginInfo.clearValueCount = clearValues.size();
                 renderPassBeginInfo.pClearValues = clearValues.data();
 
@@ -1480,9 +1474,9 @@ namespace aga
 
     void VulkanRenderer::RecreateSwapChain()
     {
-        VkExtent2D winSize = m_PlatformWindow->GetCurrentWindowSize();
+        Vector2 winSize = m_PlatformWindow->GetCurrentWindowSize();
 
-        while (winSize.width == 0 || winSize.height == 0)
+        while (winSize.Width == 0 || winSize.Height == 0)
         {
             winSize = m_PlatformWindow->GetCurrentWindowSize();
             m_PlatformWindow->Update();
