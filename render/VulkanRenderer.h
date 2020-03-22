@@ -101,10 +101,12 @@ namespace aga
         QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
         SwapChainSupportDetails FindSwapChainDetails(VkPhysicalDevice device);
 
-        VkSurfaceFormatKHR
-        _ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
-        VkPresentModeKHR
-        _ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
+        void _CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+                           VkBuffer &buffer, VkDeviceMemory &bufferMemory);
+        void _CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+
+        VkSurfaceFormatKHR _ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
+        VkPresentModeKHR _ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
         Rect2D _ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 
         bool _IsPhysicalDeviceSuitable(VkPhysicalDevice device);
