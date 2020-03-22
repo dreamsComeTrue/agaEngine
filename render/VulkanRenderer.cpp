@@ -84,15 +84,11 @@ namespace aga
         }
     };
 
-    const std::vector<Vertex> vertices = {
-        {{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},  // 1
-        {{0.4f, 0.0f}, {0.0f, 1.0f, 0.0f}},   // 2
-        {{-0.4f, 0.0f}, {0.0f, 0.0f, 1.0f}},  // 3
-        //---
-        {{0.4f, 0.0f}, {0.0f, 1.0f, 0.0f}},  // 4
-        {{0.0f, 0.5f}, {1.0f, 0.0f, 0.0f}},  // 5
-        {{-0.4f, 0.0f}, {0.0f, 0.0f, 1.0f}}  // 6
-    };
+    const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+                                          {{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+                                          {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+                                          {{-0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}}};
+    const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
     VulkanRenderer::VulkanRenderer() :
         m_PlatformWindow(nullptr),
@@ -116,6 +112,8 @@ namespace aga
         m_FramebufferResized(false),
         m_VertexBuffer(VK_NULL_HANDLE),
         m_VertexBufferMemory(VK_NULL_HANDLE),
+        m_IndexBuffer(VK_NULL_HANDLE),
+        m_IndexBufferMemory(VK_NULL_HANDLE),
         m_DepthStencilImage(VK_NULL_HANDLE),
         m_DepthStencilImageView(VK_NULL_HANDLE),
         m_DepthStencilImageMemory(VK_NULL_HANDLE),
@@ -815,6 +813,11 @@ namespace aga
             return false;
         }
 
+        if (!CreateIndexBuffer())
+        {
+            return false;
+        }
+
         if (!CreateCommandBuffers())
         {
             return false;
@@ -831,6 +834,7 @@ namespace aga
     void VulkanRenderer::Destroy()
     {
         DestroySwapChain();
+        DestroyIndexBuffer();
         DestroyVertexBuffer();
         DestroySynchronizations();
         DestroyCommandPool();
@@ -1298,6 +1302,42 @@ namespace aga
 
     bool VulkanRenderer::CreateVertexBuffer()
     {
+        VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        _CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
+                      stagingBufferMemory);
+
+        void *data;
+        vkMapMemory(m_VulkanDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, indices.data(), (size_t)bufferSize);
+        vkUnmapMemory(m_VulkanDevice, stagingBufferMemory);
+
+        _CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_IndexBuffer, m_IndexBufferMemory);
+
+        _CopyBuffer(stagingBuffer, m_IndexBuffer, bufferSize);
+
+        vkDestroyBuffer(m_VulkanDevice, stagingBuffer, nullptr);
+        vkFreeMemory(m_VulkanDevice, stagingBufferMemory, nullptr);
+
+        LOG_DEBUG_F("Vulkan Vertex Buffer created\n");
+
+        return true;
+    }
+
+    void VulkanRenderer::DestroyVertexBuffer()
+    {
+        vkDestroyBuffer(m_VulkanDevice, m_VertexBuffer, nullptr);
+        vkFreeMemory(m_VulkanDevice, m_VertexBufferMemory, nullptr);
+
+        LOG_DEBUG_F("Vulkan Vertex Buffer destroyed\n");
+    }
+
+    bool VulkanRenderer::CreateIndexBuffer()
+    {
         VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
         VkBuffer stagingBuffer;
@@ -1322,6 +1362,14 @@ namespace aga
         LOG_DEBUG_F("Vulkan Vertex Buffer created\n");
 
         return true;
+    }
+
+    void VulkanRenderer::DestroyIndexBuffer()
+    {
+        vkDestroyBuffer(m_VulkanDevice, m_IndexBuffer, nullptr);
+        vkFreeMemory(m_VulkanDevice, m_IndexBufferMemory, nullptr);
+
+        LOG_DEBUG_F("Vulkan Index Buffer destroyed\n");
     }
 
     void VulkanRenderer::_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
@@ -1385,14 +1433,6 @@ namespace aga
         vkFreeCommandBuffers(m_VulkanDevice, m_CommandPool, 1, &commandBuffer);
     }
 
-    void VulkanRenderer::DestroyVertexBuffer()
-    {
-        vkDestroyBuffer(m_VulkanDevice, m_VertexBuffer, nullptr);
-        vkFreeMemory(m_VulkanDevice, m_VertexBufferMemory, nullptr);
-
-        LOG_DEBUG_F("Vulkan Vertex Buffer destroyed\n");
-    }
-
     bool VulkanRenderer::CreateCommandBuffers()
     {
         m_CommandBuffers.resize(m_FrameBuffers.size());
@@ -1440,8 +1480,9 @@ namespace aga
                 VkBuffer vertexBuffers[] = {m_VertexBuffer};
                 VkDeviceSize offsets[] = {0};
                 vkCmdBindVertexBuffers(m_CommandBuffers[i], 0, 1, vertexBuffers, offsets);
+                vkCmdBindIndexBuffer(m_CommandBuffers[i], m_IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-                vkCmdDraw(m_CommandBuffers[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+                vkCmdDrawIndexed(m_CommandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
                 vkCmdEndRenderPass(m_CommandBuffers[i]);
             }

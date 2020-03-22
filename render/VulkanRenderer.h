@@ -76,6 +76,9 @@ namespace aga
         bool CreateVertexBuffer();
         void DestroyVertexBuffer();
 
+        bool CreateIndexBuffer();
+        void DestroyIndexBuffer();
+
         bool CreateCommandBuffers();
 
         const VkInstance GetVulkanInstance();
@@ -178,6 +181,8 @@ namespace aga
 
         VkBuffer m_VertexBuffer;
         VkDeviceMemory m_VertexBufferMemory;
+        VkBuffer m_IndexBuffer;
+        VkDeviceMemory m_IndexBufferMemory;
 
         VkImage m_DepthStencilImage;
         VkDeviceMemory m_DepthStencilImageMemory;
