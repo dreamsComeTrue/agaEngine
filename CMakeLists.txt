@@ -18,6 +18,21 @@ target_include_directories (agaEngine
     PUBLIC ${VULKAN_INCLUDE_DIRS}
 )
 
+execute_process (
+    WORKING_DIRECTORY "../data/shaders/"
+    COMMAND bash -c "./compile_shaders.sh"
+)
+
+execute_process (
+    WORKING_DIRECTORY "../data/shaders/"
+    COMMAND bash -c "cp *.spv ../../build/data/shaders/"
+)
+
+execute_process (
+    WORKING_DIRECTORY "../data/textures/"
+    COMMAND bash -c "cp -a . ../../build/data/textures/"
+)
+
 target_link_libraries (agaEngine ${XCB_LIBRARIES} ${Vulkan_LIBRARIES})
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/")

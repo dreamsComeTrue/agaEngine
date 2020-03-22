@@ -20,7 +20,7 @@ namespace aga
 
         if (!file.is_open())
         {
-            LOG_ERROR_F("Failed to open file: " + path);
+            LOG_ERROR_F("Failed to open file: " + path + "\n");
 
             return "";
         }

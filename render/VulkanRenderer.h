@@ -91,6 +91,15 @@ namespace aga
         bool CreateDescriptorSets();
         void DestroyDescriptorSets();
 
+        bool CreateTextureImage();
+        void DestroyTextureImage();
+
+        bool CreateTextureImageView();
+        void DestroyTextureImageView();
+        
+        bool CreateTextureSampler();
+        void DestroyTextureSampler();
+
         bool CreateCommandBuffers();
 
         const VkInstance GetVulkanInstance();
@@ -116,6 +125,15 @@ namespace aga
         QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
         SwapChainSupportDetails FindSwapChainDetails(VkPhysicalDevice device);
 
+        VkCommandBuffer _BeginSingleTimeCommands();
+        void _EndSingleTimeCommands(VkCommandBuffer commandBuffer);
+
+        void _TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+        void _CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+        void _CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
+                          VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image,
+                          VkDeviceMemory &imageMemory);
+        VkImageView _CreateImageView(VkImage image, VkFormat format);
         void _CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
                            VkBuffer &buffer, VkDeviceMemory &bufferMemory);
         void _CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -203,6 +221,11 @@ namespace aga
 
         std::vector<VkBuffer> m_UniformBuffers;
         std::vector<VkDeviceMemory> m_UniformBuffersMemory;
+
+        VkImage m_TextureImage;
+        VkDeviceMemory m_TextureImageMemory;
+        VkImageView m_TextureImageView;
+        VkSampler m_TextureSampler;
 
         VkImage m_DepthStencilImage;
         VkDeviceMemory m_DepthStencilImageMemory;
