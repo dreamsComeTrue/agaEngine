@@ -96,7 +96,7 @@ namespace aga
 
         bool CreateTextureImageView();
         void DestroyTextureImageView();
-        
+
         bool CreateTextureSampler();
         void DestroyTextureSampler();
 
@@ -133,7 +133,7 @@ namespace aga
         void _CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
                           VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage &image,
                           VkDeviceMemory &imageMemory);
-        VkImageView _CreateImageView(VkImage image, VkFormat format);
+        VkImageView _CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
         void _CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
                            VkBuffer &buffer, VkDeviceMemory &bufferMemory);
         void _CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -156,6 +156,9 @@ namespace aga
                                      const VkMemoryRequirements *memoryRequirements,
                                      const VkMemoryPropertyFlags requiredPropertyFlags);
         uint32_t _FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+        VkFormat _FindSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling,
+                                      VkFormatFeatureFlags features);
+        VkFormat _FindDepthFormat();
 
     private:
         PlatformWindowBase *m_PlatformWindow;

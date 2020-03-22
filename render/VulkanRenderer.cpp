@@ -59,7 +59,7 @@ namespace aga
 
     struct Vertex
     {
-        Vector2 Position;
+        Vector3 Position;
         Vector3 Color;
         Vector2 TexCoord;
 
@@ -79,7 +79,7 @@ namespace aga
 
             attributeDescriptions[0].binding = 0;
             attributeDescriptions[0].location = 0;
-            attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+            attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
             attributeDescriptions[0].offset = offsetof(Vertex, Position);
 
             attributeDescriptions[1].binding = 0;
@@ -103,12 +103,17 @@ namespace aga
         Matrix Projection;
     };
 
-    const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-                                          {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-                                          {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-                                          {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}};
+    const std::vector<Vertex> vertices = {{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                          {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                                          {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                                          {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
 
-    const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
+                                          {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                                          {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                                          {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                                          {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}};
+
+    const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
 
     VulkanRenderer::VulkanRenderer() :
         m_PlatformWindow(nullptr),
@@ -325,7 +330,8 @@ namespace aga
 
         for (uint32_t i = 0; i < m_SwapChainImageCount; ++i)
         {
-            m_SwapChainImagesViews[i] = _CreateImageView(m_SwapChainImages[i], m_SurfaceFormat.format);
+            m_SwapChainImagesViews[i] =
+                _CreateImageView(m_SwapChainImages[i], m_SurfaceFormat.format, VK_IMAGE_ASPECT_COLOR_BIT);
         }
 
         LOG_DEBUG_F("VulkanRenderer Vulkan SwapChain Images created\n");
@@ -346,22 +352,15 @@ namespace aga
         LOG_DEBUG_F("VulkanRenderer Vulkan SwapChain Images destroyed\n");
     }
 
+    VkFormat VulkanRenderer::_FindDepthFormat()
+    {
+        return _FindSupportedFormat({VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+                                    VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    }
+
     bool VulkanRenderer::CreateDepthStencilImage()
     {
-        std::vector<VkFormat> formats{VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT,
-                                      VK_FORMAT_D16_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D16_UNORM};
-
-        for (VkFormat &format : formats)
-        {
-            VkFormatProperties formatProperties = {};
-            vkGetPhysicalDeviceFormatProperties(m_VulkanPhysicalDevice, format, &formatProperties);
-
-            if (formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
-            {
-                m_DepthStencilFormat = format;
-                break;
-            }
-        }
+        m_DepthStencilFormat = _FindDepthFormat();
 
         if (m_DepthStencilFormat == VK_FORMAT_UNDEFINED)
         {
@@ -377,63 +376,12 @@ namespace aga
             m_IsStencilAvailable = true;
         }
 
-        VkImageCreateInfo imageCreateInfo = {};
-        imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        imageCreateInfo.flags = 0;
-        imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-        imageCreateInfo.format = m_DepthStencilFormat;
-        imageCreateInfo.extent.width = m_SurfaceWidth;
-        imageCreateInfo.extent.height = m_SurfaceHeight;
-        imageCreateInfo.extent.depth = 1;
-        imageCreateInfo.mipLevels = 1;
-        imageCreateInfo.arrayLayers = 1;
-        imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        imageCreateInfo.queueFamilyIndexCount = VK_QUEUE_FAMILY_IGNORED;
-        imageCreateInfo.pQueueFamilyIndices = VK_NULL_HANDLE;
-        imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        _CreateImage(m_SurfaceWidth, m_SurfaceHeight, m_DepthStencilFormat, VK_IMAGE_TILING_OPTIMAL,
+                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                     m_DepthStencilImage, m_DepthStencilImageMemory);
 
-        vkCreateImage(m_VulkanDevice, &imageCreateInfo, VK_NULL_HANDLE, &m_DepthStencilImage);
-
-        VkMemoryRequirements imageMemoryRequirements;
-        vkGetImageMemoryRequirements(m_VulkanDevice, m_DepthStencilImage, &imageMemoryRequirements);
-
-        uint32_t memoryIndex = FindMemoryTypeIndex(&GetVulkanPhysicalDeviceMemoryProperties(), &imageMemoryRequirements,
-                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        if (memoryIndex == UINT32_MAX)
-        {
-            LOG_ERROR_F("VulkanRenderer DepthStencil memory index not selected\n");
-
-            return false;
-        }
-
-        VkMemoryAllocateInfo memoryAllocateInfo = {};
-        memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        memoryAllocateInfo.allocationSize = imageMemoryRequirements.size;
-        memoryAllocateInfo.memoryTypeIndex = memoryIndex;
-
-        vkAllocateMemory(m_VulkanDevice, &memoryAllocateInfo, VK_NULL_HANDLE, &m_DepthStencilImageMemory);
-        vkBindImageMemory(m_VulkanDevice, m_DepthStencilImage, m_DepthStencilImageMemory, 0);
-
-        VkImageViewCreateInfo imageViewCreateInfo = {};
-        imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        imageViewCreateInfo.image = m_DepthStencilImage;
-        imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        imageViewCreateInfo.format = m_DepthStencilFormat;
-        imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        imageViewCreateInfo.subresourceRange.aspectMask =
-            VK_IMAGE_ASPECT_DEPTH_BIT | (m_IsStencilAvailable ? VK_IMAGE_ASPECT_STENCIL_BIT : 0);
-        imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-        imageViewCreateInfo.subresourceRange.levelCount = 1;
-        imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-        imageViewCreateInfo.subresourceRange.layerCount = 1;
-
-        vkCreateImageView(m_VulkanDevice, &imageViewCreateInfo, VK_NULL_HANDLE, &m_DepthStencilImageView);
+        m_DepthStencilImageView =
+            _CreateImageView(m_DepthStencilImage, m_DepthStencilFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
         LOG_DEBUG_F("VulkanRenderer DepthStencil Image created\n");
 
@@ -452,6 +400,31 @@ namespace aga
         m_DepthStencilImage = VK_NULL_HANDLE;
 
         LOG_DEBUG_F("VulkanRenderer DepthStencil Image destroyed\n");
+    }
+
+    VkFormat VulkanRenderer::_FindSupportedFormat(const std::vector<VkFormat> &candidates, VkImageTiling tiling,
+                                                  VkFormatFeatureFlags features)
+    {
+        for (VkFormat format : candidates)
+        {
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties(m_VulkanPhysicalDevice, format, &props);
+
+            if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features)
+            {
+                return format;
+            }
+            else if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features)
+            {
+                return format;
+            }
+        }
+
+        LOG_ERROR_F("Failed to find supported format!");
+
+        std::exit(-1);
+
+        return VK_FORMAT_UNDEFINED;
     }
 
     bool VulkanRenderer::CreateGraphicsPipeline()
@@ -529,9 +502,13 @@ namespace aga
         multisampling.sampleShadingEnable = VK_FALSE;
         multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-        // VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo = {};
-        // depthStencilStateCreateInfo.sType =
-        //     VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+        depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthStencil.depthTestEnable = VK_TRUE;
+        depthStencil.depthWriteEnable = VK_TRUE;
+        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+        depthStencil.depthBoundsTestEnable = VK_FALSE;
+        depthStencil.stencilTestEnable = VK_FALSE;
 
         VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
         colorBlendAttachment.colorWriteMask =
@@ -567,7 +544,7 @@ namespace aga
         pipelineCreateInfo.pViewportState = &viewportState;
         pipelineCreateInfo.pRasterizationState = &rasterizer;
         pipelineCreateInfo.pMultisampleState = &multisampling;
-        // pipelineCreateInfo.pDepthStencilState = VK_NULL_HANDLE;
+        pipelineCreateInfo.pDepthStencilState = &depthStencil;
         pipelineCreateInfo.pColorBlendState = &colorBlending;
         pipelineCreateInfo.layout = m_PipelineLayout;
         pipelineCreateInfo.renderPass = m_RenderPass;
@@ -610,17 +587,7 @@ namespace aga
 
     bool VulkanRenderer::CreateRenderPass()
     {
-        std::array<VkAttachmentDescription, 1> attachments = {};
-        // attachments[0].flags = 0;
-        // attachments[0].format = m_DepthStencilFormat;
-        // attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-        // attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        // attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        // attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        // attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-        // attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        // attachments[0].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
+        std::array<VkAttachmentDescription, 2> attachments = {};
         attachments[0].format = m_SurfaceFormat.format;
         attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -630,19 +597,28 @@ namespace aga
         attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-        // VkAttachmentReference subPass0DepthStencilAttachment = {};
-        // subPass0DepthStencilAttachment.attachment = 0;
-        // subPass0DepthStencilAttachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[1].format = _FindDepthFormat();
+        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        std::array<VkAttachmentReference, 1> subPass0ColorAttachments = {};
-        subPass0ColorAttachments[0].attachment = 0;
-        subPass0ColorAttachments[0].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        VkAttachmentReference colorAttachmentRef = {};
+        colorAttachmentRef.attachment = 0;
+        colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-        std::array<VkSubpassDescription, 1> subPasses = {};
-        subPasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        subPasses[0].colorAttachmentCount = subPass0ColorAttachments.size();
-        subPasses[0].pColorAttachments = subPass0ColorAttachments.data();
-        //  subPasses[0].pDepthStencilAttachment = &subPass0DepthStencilAttachment;
+        VkAttachmentReference depthAttachmentRef = {};
+        depthAttachmentRef.attachment = 1;
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription subpass = {};
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorAttachmentRef;
+        subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
         VkSubpassDependency dependency = {};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -654,10 +630,10 @@ namespace aga
 
         VkRenderPassCreateInfo renderPassCreateInfo = {};
         renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        renderPassCreateInfo.attachmentCount = attachments.size();
+        renderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         renderPassCreateInfo.pAttachments = attachments.data();
-        renderPassCreateInfo.subpassCount = subPasses.size();
-        renderPassCreateInfo.pSubpasses = subPasses.data();
+        renderPassCreateInfo.subpassCount = 1;
+        renderPassCreateInfo.pSubpasses = &subpass;
         renderPassCreateInfo.dependencyCount = 1;
         renderPassCreateInfo.pDependencies = &dependency;
 
@@ -717,9 +693,7 @@ namespace aga
 
         for (uint32_t i = 0; i < m_SwapChainImagesViews.size(); ++i)
         {
-            std::array<VkImageView, 1> attachments = {};
-            //      attachments[0] = m_DepthStencilImageView;
-            attachments[0] = m_SwapChainImagesViews[i];
+            std::array<VkImageView, 2> attachments = {m_SwapChainImagesViews[i], m_DepthStencilImageView};
 
             VkFramebufferCreateInfo frameBufferCreateInfo = {};
             frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -827,11 +801,6 @@ namespace aga
             return false;
         }
 
-        // if (!CreateDepthStencilImage())
-        // {
-        //     return false;
-        // }
-
         if (!CreateRenderPass())
         {
             return false;
@@ -847,12 +816,17 @@ namespace aga
             return false;
         }
 
-        if (!CreateFrameBuffers())
+        if (!CreateCommandPool())
         {
             return false;
         }
 
-        if (!CreateCommandPool())
+        if (!CreateDepthStencilImage())
+        {
+            return false;
+        }
+
+        if (!CreateFrameBuffers())
         {
             return false;
         }
@@ -921,9 +895,6 @@ namespace aga
         DestroyVertexBuffer();
         DestroySynchronizations();
         DestroyCommandPool();
-
-        // DestroyDepthStencilImage();
-
         _DestroyLogicalDevice();
 
 #if BUILD_ENABLE_VULKAN_DEBUG
@@ -1627,7 +1598,7 @@ namespace aga
 
     bool VulkanRenderer::CreateTextureImageView()
     {
-        m_TextureImageView = _CreateImageView(m_TextureImage, VK_FORMAT_R8G8B8A8_SRGB);
+        m_TextureImageView = _CreateImageView(m_TextureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 
         return true;
     }
@@ -1665,14 +1636,14 @@ namespace aga
         vkDestroySampler(m_VulkanDevice, m_TextureSampler, VK_NULL_HANDLE);
     }
 
-    VkImageView VulkanRenderer::_CreateImageView(VkImage image, VkFormat format)
+    VkImageView VulkanRenderer::_CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
     {
         VkImageViewCreateInfo viewInfo = {};
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = image;
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         viewInfo.format = format;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.aspectMask = aspectFlags;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
         viewInfo.subresourceRange.baseArrayLayer = 0;
@@ -1904,14 +1875,9 @@ namespace aga
             CheckResult(vkBeginCommandBuffer(m_CommandBuffers[i], &commandBufferBeginInfo),
                         "Error while running vkBeginCommandBuffer");
             {
-                std::array<VkClearValue, 1> clearValues = {};
-                //   clearValues[0].depthStencil.depth = 0.0f;
-                //    clearValues[0].depthStencil.stencil = 0;
-
-                clearValues[0].color.float32[0] = 0.01f;
-                clearValues[0].color.float32[1] = 0.01f;
-                clearValues[0].color.float32[2] = 0.01f;
-                clearValues[0].color.float32[3] = 0.0f;
+                std::array<VkClearValue, 2> clearValues = {};
+                clearValues[0].color = {0.01f, 0.01f, 0.01f, 1.0f};
+                clearValues[1].depthStencil = {1.0f, 0};
 
                 VkRenderPassBeginInfo renderPassBeginInfo = {};
                 renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1953,6 +1919,7 @@ namespace aga
 
     void VulkanRenderer::DestroySwapChain()
     {
+        DestroyDepthStencilImage();
         DestroyFrameBuffers();
 
         vkFreeCommandBuffers(m_VulkanDevice, m_CommandPool, static_cast<uint32_t>(m_CommandBuffers.size()),
@@ -1988,6 +1955,7 @@ namespace aga
         CreateSwapChainImages();
         CreateRenderPass();
         CreateGraphicsPipeline();
+        CreateDepthStencilImage();
         CreateFrameBuffers();
         CreateUniformBuffers();
         CreateDescriptorPool();
