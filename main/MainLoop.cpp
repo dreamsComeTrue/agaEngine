@@ -44,8 +44,7 @@ namespace aga
         if (m_PlatformWindowBase->Initialize(title, width, height))
         {
             m_Renderer->SetPlatformWindow(m_PlatformWindowBase);
-            
-            
+
             return m_Renderer->Initialize();
         }
 
@@ -55,6 +54,7 @@ namespace aga
     void MainLoop::DestroyWindow()
     {
         vkDeviceWaitIdle(m_Renderer->GetVulkanDevice());
+        m_PlatformWindowBase->Destroy();
         SAFE_DELETE(m_PlatformWindowBase);
     }
 

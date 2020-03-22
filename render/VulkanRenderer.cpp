@@ -954,11 +954,11 @@ namespace aga
         std::vector<VkExtensionProperties> extensions(extensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-        LOG_INFO("Available extensions:\n");
+        LOG_DEBUG("Available extensions:\n");
 
         for (const VkExtensionProperties &extension : extensions)
         {
-            LOG_INFO(String("\t") + extension.extensionName + "\n");
+            LOG_DEBUG(String("\t") + extension.extensionName + "\n");
         }
 
         m_InstanceExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
