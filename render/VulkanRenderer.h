@@ -61,6 +61,9 @@ namespace aga
         bool CreateRenderPass();
         void DestroyRenderPass();
 
+        bool CreateDescriptorSetLayout();
+        void DestroyDescriptorSetLayout();
+
         bool CreateGraphicsPipeline();
         void DestroyGraphicsPipeline();
 
@@ -78,6 +81,15 @@ namespace aga
 
         bool CreateIndexBuffer();
         void DestroyIndexBuffer();
+
+        bool CreateUniformBuffers();
+        void DestroyUniformBuffers();
+
+        bool CreateDescriptorPool();
+        void DestroyDescriptorPool();
+
+        bool CreateDescriptorSets();
+        void DestroyDescriptorSets();
 
         bool CreateCommandBuffers();
 
@@ -107,6 +119,7 @@ namespace aga
         void _CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
                            VkBuffer &buffer, VkDeviceMemory &bufferMemory);
         void _CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+        void _UpdateUniformBuffer();
 
         VkSurfaceFormatKHR _ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
         VkPresentModeKHR _ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
@@ -162,6 +175,10 @@ namespace aga
         uint32_t m_SwapChainImageCount;
         uint32_t m_ActiveSwapChainImageID;
 
+        VkDescriptorSetLayout m_DescriptorSetLayout;
+        VkDescriptorPool m_DescriptorPool;
+        std::vector<VkDescriptorSet> m_DescriptorSets;
+
         VkPipelineLayout m_PipelineLayout;
         VkPipeline m_GraphicsPipeline;
 
@@ -183,6 +200,9 @@ namespace aga
         VkDeviceMemory m_VertexBufferMemory;
         VkBuffer m_IndexBuffer;
         VkDeviceMemory m_IndexBufferMemory;
+
+        std::vector<VkBuffer> m_UniformBuffers;
+        std::vector<VkDeviceMemory> m_UniformBuffersMemory;
 
         VkImage m_DepthStencilImage;
         VkDeviceMemory m_DepthStencilImageMemory;

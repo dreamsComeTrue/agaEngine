@@ -5,11 +5,14 @@
 #include "core/Common.h"
 #include "core/Logger.h"
 #include "core/Typedefs.h"
+#include "core/math/Matrix.h"
 #include "core/math/Vector2.h"
 #include "core/math/Vector3.h"
 #include "platform/Platform.h"
 #include "platform/PlatformFileSystem.h"
 #include "platform/PlatformWindow.h"
+
+#include <chrono>
 
 const int MAX_FRAMES_IN_PROCESS = 2;
 
@@ -84,6 +87,13 @@ namespace aga
         }
     };
 
+    struct UniformBufferObject
+    {
+        Matrix Model;
+        Matrix View;
+        Matrix Projection;
+    };
+
     const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
                                           {{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
                                           {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
@@ -105,6 +115,8 @@ namespace aga
         m_SwapChain(VK_NULL_HANDLE),
         m_SwapChainImageCount(2),
         m_ActiveSwapChainImageID(0),
+        m_DescriptorSetLayout(VK_NULL_HANDLE),
+        m_DescriptorPool(VK_NULL_HANDLE),
         m_PipelineLayout(VK_NULL_HANDLE),
         m_GraphicsPipeline(VK_NULL_HANDLE),
         m_RenderPass(VK_NULL_HANDLE),
@@ -146,6 +158,8 @@ namespace aga
 
             return false;
         }
+
+        _UpdateUniformBuffer();
 
         if (m_ImagesInProcess[m_ActiveSwapChainImageID] != VK_NULL_HANDLE)
         {
@@ -513,7 +527,7 @@ namespace aga
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
         rasterizer.lineWidth = 1.0f;
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-        rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;
 
         VkPipelineMultisampleStateCreateInfo multisampling = {};
@@ -543,7 +557,8 @@ namespace aga
 
         VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        pipelineLayoutInfo.setLayoutCount = 0;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &m_DescriptorSetLayout;
         pipelineLayoutInfo.pushConstantRangeCount = 0;
 
         CheckResult(vkCreatePipelineLayout(m_VulkanDevice, &pipelineLayoutInfo, VK_NULL_HANDLE, &m_PipelineLayout),
@@ -594,7 +609,7 @@ namespace aga
 
         VkShaderModule shaderModule;
         CheckResult(vkCreateShaderModule(m_VulkanDevice, &shaderModuleCreateInfo, VK_NULL_HANDLE, &shaderModule),
-                    "Failed to create shader module!");
+                    "Failed to create shader module!\n");
 
         return shaderModule;
     }
@@ -665,6 +680,33 @@ namespace aga
         vkDestroyRenderPass(m_VulkanDevice, m_RenderPass, VK_NULL_HANDLE);
 
         LOG_DEBUG_F("VulkanRenderer RenderPass destroyed\n");
+    }
+
+    bool VulkanRenderer::CreateDescriptorSetLayout()
+    {
+        VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+        uboLayoutBinding.binding = 0;
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.pImmutableSamplers = VK_NULL_HANDLE;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings = &uboLayoutBinding;
+
+        CheckResult(vkCreateDescriptorSetLayout(m_VulkanDevice, &layoutInfo, VK_NULL_HANDLE, &m_DescriptorSetLayout),
+                    "Failed to create descriptor set layout!\n");
+
+        return true;
+    }
+
+    void VulkanRenderer::DestroyDescriptorSetLayout()
+    {
+        vkDestroyDescriptorSetLayout(m_VulkanDevice, m_DescriptorSetLayout, VK_NULL_HANDLE);
+
+        LOG_DEBUG_F("VulkanRenderer DescriptorSetLayout destroyed\n");
     }
 
     bool VulkanRenderer::CreateFrameBuffers()
@@ -793,6 +835,11 @@ namespace aga
             return false;
         }
 
+        if (!CreateDescriptorSetLayout())
+        {
+            return false;
+        }
+
         if (!CreateGraphicsPipeline())
         {
             return false;
@@ -818,6 +865,21 @@ namespace aga
             return false;
         }
 
+        if (!CreateUniformBuffers())
+        {
+            return false;
+        }
+
+        if (!CreateDescriptorPool())
+        {
+            return false;
+        }
+
+        if (!CreateDescriptorSets())
+        {
+            return false;
+        }
+
         if (!CreateCommandBuffers())
         {
             return false;
@@ -834,6 +896,7 @@ namespace aga
     void VulkanRenderer::Destroy()
     {
         DestroySwapChain();
+        DestroyDescriptorSetLayout();
         DestroyIndexBuffer();
         DestroyVertexBuffer();
         DestroySynchronizations();
@@ -1372,6 +1435,106 @@ namespace aga
         LOG_DEBUG_F("Vulkan Index Buffer destroyed\n");
     }
 
+    bool VulkanRenderer::CreateUniformBuffers()
+    {
+        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+        m_UniformBuffers.resize(m_SwapChainImages.size());
+        m_UniformBuffersMemory.resize(m_SwapChainImages.size());
+
+        for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+        {
+            _CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                          m_UniformBuffers[i], m_UniformBuffersMemory[i]);
+        }
+
+        LOG_DEBUG_F("Vulkan Uniforms Buffers created\n");
+
+        return true;
+    }
+
+    void VulkanRenderer::DestroyUniformBuffers()
+    {
+        for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+        {
+            vkDestroyBuffer(m_VulkanDevice, m_UniformBuffers[i], nullptr);
+            vkFreeMemory(m_VulkanDevice, m_UniformBuffersMemory[i], nullptr);
+        }
+
+        LOG_DEBUG_F("Vulkan Uniforms Buffers destroyed\n");
+    }
+
+    bool VulkanRenderer::CreateDescriptorPool()
+    {
+        VkDescriptorPoolSize poolSize = {};
+        poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSize.descriptorCount = static_cast<uint32_t>(m_SwapChainImages.size());
+
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = &poolSize;
+        poolInfo.maxSets = static_cast<uint32_t>(m_SwapChainImages.size());
+
+        CheckResult(vkCreateDescriptorPool(m_VulkanDevice, &poolInfo, nullptr, &m_DescriptorPool),
+                    "failed to create descriptor pool!");
+
+        LOG_DEBUG_F("Vulkan Descriptor Pool created\n");
+
+        return true;
+    }
+
+    void VulkanRenderer::DestroyDescriptorPool()
+    {
+        vkDestroyDescriptorPool(m_VulkanDevice, m_DescriptorPool, nullptr);
+
+        LOG_DEBUG_F("Vulkan Descriptor Pool destroyed\n");
+    }
+
+    bool VulkanRenderer::CreateDescriptorSets()
+    {
+        std::vector<VkDescriptorSetLayout> layouts(m_SwapChainImages.size(), m_DescriptorSetLayout);
+        VkDescriptorSetAllocateInfo allocInfo = {};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = m_DescriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(m_SwapChainImages.size());
+        allocInfo.pSetLayouts = layouts.data();
+
+        m_DescriptorSets.resize(m_SwapChainImages.size());
+
+        CheckResult(vkAllocateDescriptorSets(m_VulkanDevice, &allocInfo, m_DescriptorSets.data()),
+                    "Failed to allocate descriptor sets!");
+
+        for (size_t i = 0; i < m_SwapChainImages.size(); i++)
+        {
+            VkDescriptorBufferInfo bufferInfo = {};
+            bufferInfo.buffer = m_UniformBuffers[i];
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(UniformBufferObject);
+
+            VkWriteDescriptorSet descriptorWrite = {};
+            descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrite.dstSet = m_DescriptorSets[i];
+            descriptorWrite.dstBinding = 0;
+            descriptorWrite.dstArrayElement = 0;
+            descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrite.descriptorCount = 1;
+            descriptorWrite.pBufferInfo = &bufferInfo;
+
+            vkUpdateDescriptorSets(m_VulkanDevice, 1, &descriptorWrite, 0, nullptr);
+        }
+
+        LOG_DEBUG_F("Vulkan Descriptor Sets created\n");
+
+        return true;
+    }
+
+    void VulkanRenderer::DestroyDescriptorSets()
+    {
+        LOG_DEBUG_F("Vulkan Descriptor Sets destroyed\n");
+    }
+
     void VulkanRenderer::_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
                                        VkBuffer &buffer, VkDeviceMemory &bufferMemory)
     {
@@ -1433,6 +1596,26 @@ namespace aga
         vkFreeCommandBuffers(m_VulkanDevice, m_CommandPool, 1, &commandBuffer);
     }
 
+    void VulkanRenderer::_UpdateUniformBuffer()
+    {
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UniformBufferObject ubo = {};
+        ubo.Model = ubo.Model.SetRotationAxisRadians(time * DegToRad(30.0f), Vector3(0.0f, 0.0f, 1.0f));
+        ubo.View = ubo.View.LookAt(Vector3(2.0f, 2.0f, 2.0f), Vector3(0.0f, 0.0f, 0.0f), Vector3(0.0f, 0.0f, 1.0f));
+        ubo.Projection = ubo.Projection.ProjectionMatrixPerspectiveFov(
+            DegToRad(45.0f), m_SurfaceWidth / (real_t)m_SurfaceHeight, 0.1f, 10.0f);
+        ubo.Projection[1][1] *= -1;
+
+        void *data;
+        vkMapMemory(m_VulkanDevice, m_UniformBuffersMemory[m_ActiveSwapChainImageID], 0, sizeof(ubo), 0, &data);
+        memcpy(data, &ubo, sizeof(ubo));
+        vkUnmapMemory(m_VulkanDevice, m_UniformBuffersMemory[m_ActiveSwapChainImageID]);
+    }
+
     bool VulkanRenderer::CreateCommandBuffers()
     {
         m_CommandBuffers.resize(m_FrameBuffers.size());
@@ -1458,9 +1641,9 @@ namespace aga
                 //   clearValues[0].depthStencil.depth = 0.0f;
                 //    clearValues[0].depthStencil.stencil = 0;
 
-                clearValues[0].color.float32[0] = 0.0f;
-                clearValues[0].color.float32[1] = 0.0f;
-                clearValues[0].color.float32[2] = 1.0f;
+                clearValues[0].color.float32[0] = 0.01f;
+                clearValues[0].color.float32[1] = 0.01f;
+                clearValues[0].color.float32[2] = 0.01f;
                 clearValues[0].color.float32[3] = 0.0f;
 
                 VkRenderPassBeginInfo renderPassBeginInfo = {};
@@ -1481,6 +1664,8 @@ namespace aga
                 VkDeviceSize offsets[] = {0};
                 vkCmdBindVertexBuffers(m_CommandBuffers[i], 0, 1, vertexBuffers, offsets);
                 vkCmdBindIndexBuffer(m_CommandBuffers[i], m_IndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+                vkCmdBindDescriptorSets(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0, 1,
+                                        &m_DescriptorSets[i], 0, nullptr);
 
                 vkCmdDrawIndexed(m_CommandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
@@ -1512,6 +1697,9 @@ namespace aga
 
         vkDestroySwapchainKHR(m_VulkanDevice, m_SwapChain, VK_NULL_HANDLE);
 
+        DestroyUniformBuffers();
+        DestroyDescriptorPool();
+
         LOG_DEBUG_F("VulkanRenderer Vulkan SwapChain destroyed\n");
     }
 
@@ -1534,6 +1722,9 @@ namespace aga
         CreateRenderPass();
         CreateGraphicsPipeline();
         CreateFrameBuffers();
+        CreateUniformBuffers();
+        CreateDescriptorPool();
+        CreateDescriptorSets();
         CreateCommandBuffers();
     }
 
